@@ -1,7 +1,7 @@
 open OUnit2
-open Ast
-open Common
-open Parser
+open Sequential_interpreter.Ast
+open Sequential_interpreter.Common
+open Sequential_interpreter.Parser
 
 
 let string_of_string s = s
@@ -14,7 +14,7 @@ let common_test_suite =
                     res
                 in
                 title >:: (
-                    fun test_ctxt ->
+                    fun _test_ctxt ->
                         assert_equal
                         ~printer:string_of_string
                         res arg

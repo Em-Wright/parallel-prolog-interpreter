@@ -29,9 +29,9 @@ let rec find_vars q  =
     | [] -> []
     | (x :: xs) -> (
         match x with
-        | VarExp v -> x :: (find_vars xs)
-        | ConstExp c -> (find_vars xs)
-        | TermExp (s, el) -> (find_vars el) @ (find_vars xs)
+        | VarExp _ -> x :: (find_vars xs)
+        | ConstExp _ -> (find_vars xs)
+        | TermExp (_, el) -> (find_vars el) @ (find_vars xs)
     )
 
 (*
@@ -83,7 +83,7 @@ let sub_lift_goals sub gl =
          d - a dec type
      * returns a dec with all the variables in d renamed to fresh variable names
 *)
-let rec rename_vars_in_dec d =
+let rename_vars_in_dec d =
     match d with
     | Clause (h, b) ->
         let head_vars = find_vars [h] in
@@ -152,7 +152,7 @@ let rec replace c sub =
 let rec occurs n t =
      match t with
      | VarExp m -> n = m
-     | TermExp (st, el) ->
+     | TermExp (_, el) ->
         List.fold_left (fun acc v -> acc || (occurs n v)) false el
      | _ -> false
 
@@ -165,6 +165,8 @@ let rec occurs n t =
        otherwise returns Some(i) where i is a list of substitutions
        that unify the constraints
 *)
+
+(* John suggested considering the language guarantee that unifying a variable with anything is O(1) *)
 let rec unify constraints =
     match constraints with
     | [] -> Some []
@@ -187,7 +189,7 @@ let rec unify constraints =
             | TermExp (sname, sargs) -> (
                 match t with
                 (* Orient *)
-                | VarExp k -> unify ((t, s) :: c')
+                | VarExp _ -> unify ((t, s) :: c')
                 (* Decompose *)
                 | TermExp (tname, targs) ->
                     if (tname = sname && List.length targs = List.length sargs)
@@ -198,7 +200,7 @@ let rec unify constraints =
             | _ -> (
                 match t with
                 (* Orient *)
-                | VarExp k -> unify ((t, s) :: c')
+                | VarExp _ -> unify ((t, s) :: c')
                 | _ -> None
             )
         )
@@ -217,6 +219,13 @@ let rec unify constraints =
          - otherwise, each element is a list of substitutions for one solution
            to the query with the given db
 *)
+
+(* Would mainly just be parallelising this function - the rest of the functions are utility functions which
+will be the same across workers. One thing which could be interesting is making sure variables are actually fresh when
+we rename variables in a declaration - if workers are taking jobs from a stack, they are likely to pick up jobs put
+there by other workers, and these may contain variables which this particular worker hasn't generated yet. Not sure
+if this is a problem which can actually occur - will need to check how the substitution works, and I guess it depends
+on how I implement the stack system. Or the work stealing system, if that's the route we're taking. *)
 let rec eval_query (q, db, env) =
     match q with
     | [] -> (
@@ -236,21 +245,26 @@ let rec eval_query (q, db, env) =
         (* if goal is some other predicate *)
         | TermExp(_,_) -> (
         (* iterate over the db *)
+        (* This kinda looks like it's being done in one pass, but this step is repeated in recursive calls
+          to eval_query *)
         List.fold_right (
             fun rule r -> (
-                match (rename_vars_in_dec rule) with (* rename vars in rule *)
+                match (rename_vars_in_dec rule) with (* rename vars in rule to completely fresh ones *)
                 | Clause (h, b) -> (
                     (* check if this rule can be used for this subgoal *)
                     match unify [(g1, h)] with
+                    (* s is a list of substitutions which allows g1 and h to unify *)
                     | Some s -> (
                         match unify (s@env) with
+                        (* env2 is the new set of substitutions which is compatible with the original env
+                        and with the new set of substitutions s *)
                         | Some env2 -> (
                             if (List.length b = 1)
                             then (
                                 match b with
                                 (* if the rule proved the subgoal (ie. rule was a
                                    fact) then recurse on remaining subgoals *)
-                                | ((TermExp ("true", _)) :: ys) ->
+                                | ((TermExp ("true", _)) :: _) ->
                                     ((eval_query (
                                         sub_lift_goals s gl,
                                         db,
@@ -258,7 +272,10 @@ let rec eval_query (q, db, env) =
                                      )) @ r)
                                 (* if rule wasn't a fact then we have more
                                    subgoals from the body of the rule
-                                   to prove *)
+                                   to prove
+                                   sub_lift_goals takes our substitution list, and a list of goals,
+                                   and returns the goals with the substitution applied.
+                                *)
                                 | _ -> ((eval_query (
                                     (sub_lift_goals s b) @ (sub_lift_goals s gl),
                                     db,
@@ -267,7 +284,10 @@ let rec eval_query (q, db, env) =
                             else
                                 (* if rule wasn't a fact then we have more
                                    subgoals from the body of the rule
-                                   to prove *)
+                                   to prove
+                                   we fold the result of evaluating the query with the other possible
+                                   solutions in r
+                                *)
                                 ((eval_query (
                                     (sub_lift_goals s b) @ (sub_lift_goals s gl),
                                     db,
@@ -284,7 +304,7 @@ let rec eval_query (q, db, env) =
                 (* found a dec in the db that isn't a Clause *)
                 |  _ -> r
           )) db [] )
-        (* subgoal isn't a TermExp *)
+        (* subgoal isn't a TermExp (i.e. is a VarExp or a ConstExp) *)
         | _ -> eval_query (gl, db, env)
     )
 
@@ -316,7 +336,7 @@ let string_of_res e orig_query_vars orig_vars_num =
                      (* find variable substitution in the solution *)
                      try let f = List.assoc (VarExp v) env in (
                              match f with
-                             | VarExp v2 ->
+                             | VarExp _ ->
                                 (v ^ " is free\n") ^ r
                              | _ ->
                                 (v ^ " = " ^ (
@@ -345,14 +365,14 @@ let string_of_res e orig_query_vars orig_vars_num =
 *)
 let add_dec_to_db (dec, db) =
     match dec with
-    | Clause (h, b) -> (
+    | Clause (h, _) -> (
         match h with
         (* don't allow user to add a new definition of true *)
         | TermExp ("true", _) ->
             print_string "Can't reassign true predicate\n"; db
         | _ -> dec :: db
     )
-    | Query (b) -> (
+    | Query _ -> (
         dec :: db
     )
 
@@ -368,7 +388,7 @@ let add_dec_to_db (dec, db) =
 *)
 let eval_dec (dec, db) =
     match dec with
-    | Clause (h, b) -> add_dec_to_db (dec, db)
+    | Clause (_, _) -> add_dec_to_db (dec, db)
     | Query b -> (
         (* find all uniq VarExps in query *)
         let orig_vars = uniq (find_vars b) in

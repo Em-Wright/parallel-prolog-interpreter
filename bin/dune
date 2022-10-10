@@ -1,0 +1,5 @@
+(executable
+ (public_name sequential_interpreter)
+ (name main)
+  (promote (until-clean))
+ (libraries sequential_interpreter))

@@ -1,7 +1,7 @@
 open OUnit2
-open Common
-open Lexer
-open Parser
+open Sequential_interpreter.Common
+open Sequential_interpreter.Lexer
+open Sequential_interpreter.Parser
 
 
 let lexer_test_suite =
@@ -12,7 +12,7 @@ let lexer_test_suite =
                     arg
                 in
                 title >:: (
-                    fun test_ctxt ->
+                    fun _test_ctxt ->
                         assert_equal
                         ~printer:string_of_token_list
                         res (get_all_tokens arg)
@@ -146,7 +146,7 @@ let lexer_failure_test_suite =
                     arg
                 in
                 title >:: (
-                    fun test_ctxt ->
+                    fun _test_ctxt ->
                         assert_equal
                         None (try_get_all_tokens arg)
                 )

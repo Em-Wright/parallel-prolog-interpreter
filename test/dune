@@ -1,0 +1,4 @@
+(test
+ (name all_tests)
+(libraries ounit2 sequential_interpreter)
+)

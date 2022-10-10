@@ -1,6 +1,6 @@
 open OUnit2
-open Ast
-open Common
+open Sequential_interpreter.Ast
+open Sequential_interpreter.Common
 
 
 let parser_test_suite =
@@ -11,7 +11,7 @@ let parser_test_suite =
                     arg
                 in
                 title >:: (
-                    fun test_ctxt ->
+                    fun _test_ctxt ->
                         assert_equal
                         ~printer:string_of_dec
                         res (parse arg)
@@ -206,7 +206,7 @@ let parser_failure_test_suite =
                     arg
                 in
                 title >:: (
-                    fun test_ctxt ->
+                    fun _test_ctxt ->
                         assert_equal
                         None (try_parse arg)
                 )

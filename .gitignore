@@ -1,3 +1,33 @@
+
+_opam
+_build
+/_boot
+_perf
+*.install
+.merlin
+*.corrected
+
+# vim swap files
+*.swp
+*.swo
+
+# emacs lock files
+.#*
+
+# vscode settings
+.vscode
+
+# git-ps hooks
+.git-ps
+
+.duneboot.*
+/boot/*.cm*
+dune.exe
+src/dune_rules/setup.ml
+result
+
+.DS_Store
+
 *.annot
 *.cmo
 *.cma

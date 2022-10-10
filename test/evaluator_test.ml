@@ -1,11 +1,11 @@
 open OUnit2
-open Ast
-open Common
-open Evaluator
+open Sequential_interpreter.Ast
+open Sequential_interpreter.Common
+open Sequential_interpreter.Evaluator
 
 
 let identity_func s = s
-let turn_to_unit x = ()
+let turn_to_unit _ = ()
 
 let evaluator_test_suite =
     "Evaluator" >::: (
@@ -15,7 +15,7 @@ let evaluator_test_suite =
                     res
                 in
                 title >:: (
-                    fun test_ctxt ->
+                    fun _test_ctxt ->
                         assert_equal
                         ~printer:identity_func
                         res arg
