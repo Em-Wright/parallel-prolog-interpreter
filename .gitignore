@@ -6,6 +6,7 @@ _perf
 *.install
 .merlin
 *.corrected
+*.exe
 
 # vim swap files
 *.swp

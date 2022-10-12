@@ -241,7 +241,7 @@ let rec eval_query (q, db, env) =
               db,
               env
             )
-        )
+        )   
         (* if goal is some other predicate *)
         | TermExp(_,_) -> (
         (* iterate over the db *)
