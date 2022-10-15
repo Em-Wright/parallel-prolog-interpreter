@@ -2,7 +2,6 @@
 (ocamllex lexer)
 (library
  (name sequential_interpreter)
- (modules (:standard parser))
+ (modules (:standard parser) main)
  (libraries core ounit2 menhirLib )
 )
-

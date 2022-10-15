@@ -69,41 +69,15 @@ let parser_test_suite =
                 Clause (
                     TermExp (
                         "coord", [
-                            ConstExp (IntConst 1);
-                            ConstExp (IntConst 2);
-                            ConstExp (IntConst 3)
+                            (IntExp 1);
+                            (IntExp 2);
+                            (IntExp 3)
                         ]
                     ), [
                         TermExp ("true", [])
                     ]
                 )
             );
-            "coord(1.0, 2.0, 3.0).", (
-                Clause (
-                    TermExp (
-                        "coord", [
-                            ConstExp (FloatConst 1.);
-                            ConstExp (FloatConst 2.);
-                            ConstExp (FloatConst 3.)
-                        ]
-                    ), [
-                        TermExp ("true", [])
-                    ]
-                )
-            );
-            "cousins(\"jack\", \"jill\").", (
-                Clause (
-                    TermExp (
-                        "cousins", [
-                            ConstExp (StringConst "jack");
-                            ConstExp (StringConst "jill")
-                        ]
-                    ), [
-                        TermExp ("true", [])
-                    ]
-                )
-            );
-
             (* Rules *)
             "cat :- true.", (
                 Clause (TermExp ("cat", []), [TermExp ("true", [])])
@@ -148,6 +122,17 @@ let parser_test_suite =
                     ]
                 )
             );
+            "arithmetic_expression(X, Y) :- is(X, Y + 1).",
+                Clause (
+                   TermExp ("arithmetic_expression", [VarExp "X"; VarExp "Y"]),
+                   [TermExp ("is", [
+                        VarExp "X";
+                        ArithmeticExp (PLUS,
+                                      ArithmeticVar "Y",
+                                      ArithmeticInt 1)
+                      ])]
+              )
+    ;
 
             (* Queries *)
             "?- cat(tom).", (
@@ -217,8 +202,6 @@ let parser_failure_test_suite =
 
             (* Constants *)
             "9";
-            "3.14";
-            "\"Merry Christmas\"";
             "VAR";
 
             (* Facts *)

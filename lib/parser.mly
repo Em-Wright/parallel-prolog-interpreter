@@ -31,8 +31,7 @@
 
 /* Constants */
 %token <int> INT
-%token <float> FLOAT
-%token <string> STRING ATOM
+%token <string> ATOM
 
 /* Variables */
 %token <string> VAR
@@ -44,6 +43,8 @@
 %token LPAREN     /* (  */
 %token RPAREN     /* )  */
 %token COMMA      /* ,  */
+%token PLUS
+%token MINUS
 
 /* Meta-characters */
 %token EOF
@@ -55,7 +56,7 @@
 %type <Ast.dec> clause
 %type <Ast.exp> predicate term structure
 %type <Ast.exp list> term_list predicate_list
-%type <Ast.const> constant
+%type <Ast.arithmetic_operand> arithmetic_operand
 
 %%
 
@@ -81,12 +82,16 @@ term_list:
     | t = term; COMMA; tl = term_list                   { t :: tl }
 
 term:
-    | c = constant                                      { ConstExp c }
+    | i = INT                                           { IntExp i }
     | a = ATOM                                          { atom_sugar a }
     | v = VAR                                           { VarExp v }
     | s = structure                                     { s }
+    | a = arithmetic                                    { a }
 
-constant:
-    | i = INT                                           { IntConst i }
-    | f = FLOAT                                         { FloatConst f }
-    | s = STRING                                        { StringConst s }
+arithmetic:
+    | a1 = arithmetic_operand; PLUS; a2 = arithmetic_operand { ArithmeticExp (PLUS, a1, a2)}
+    | a1 = arithmetic_operand; MINUS; a2 = arithmetic_operand { ArithmeticExp (MINUS, a1, a2)}
+
+arithmetic_operand:
+    | i = INT                                           { ArithmeticInt i}
+    | v = VAR                                           { ArithmeticVar v}

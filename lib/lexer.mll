@@ -20,7 +20,7 @@ let digit = ['0' - '9']
 let blank_space = [' ' '\t']
 let end_of_line = '\n'
 let atom_quote = '''
-let string_quote = '"'
+(* let string_quote = '"' *)
 let line_comment = '%' [^ '\n'] *
 let open_comment = "/*"
 let close_comment = "*/"
@@ -42,11 +42,6 @@ let hexes = 'x' hex + escape
 (* Numbers *)
 let digits = digit +
 let integers = sign ? digits
-let floats =
-      integers '.' digits (['e' 'E'] sign ? digits) ?
-    | integers ['e' 'E'] sign ? digits
-let inf = '+' ? digits '.' digits "Inf"
-let neg_inf = '-' digits '.' digits "Inf"
 
 (* Variables *)
 let variable = (upper_case | underline) alphanumerical *
@@ -67,12 +62,6 @@ rule token = parse
 
     (* Numbers *)
     | integers as n     { INT   (int_of_string n)   }
-    | floats   as f     { FLOAT (float_of_string f) }
-    | inf               { FLOAT infinity            }
-    | neg_inf           { FLOAT neg_infinity        }
-
-    (* Strings *)
-    | string_quote      { strings "" lexbuf }
 
     (* Variables *)
     | variable as v     { VAR v }
@@ -84,6 +73,12 @@ rule token = parse
     | '('               { LPAREN    }
     | ')'               { RPAREN    }
     | ','               { COMMA     }
+    | '+'               { PLUS      }
+    | '-'               { MINUS     }
+    | " is "            { IS        }
+    (* | '='               { EQUALS    } *)
+    (* | '>'               { GT        } *)
+    (* | '<'               { LT        } *)
 
 and comments count = parse
     | open_comment      { comments (1 + count) lexbuf }
@@ -94,12 +89,6 @@ and comments count = parse
     | eof               { raise (Failure "unmatched open comment") }
     | _                 { comments count lexbuf }
 
-and strings acc = parse
-    (* Consecutive strings are concatenated into a single string *)
-    | string_quote blank_space * string_quote   { strings acc lexbuf }
-    | string_quote                              { STRING acc }
-    | non_escape # ['"'] + as s                 { strings (acc ^ s) lexbuf }
-    | escape                                    { escaped strings acc lexbuf }
 
 and atoms acc = parse
     | atom_quote                    { ATOM acc }
@@ -118,7 +107,6 @@ and escaped callback acc = parse
     | 'd'           { callback (acc ^ (String.make 1 (char_of_int 127))) lexbuf }
     | escape        { callback (acc ^ "\\") lexbuf }
     | atom_quote    { callback (acc ^  "'") lexbuf }
-    | string_quote  { callback (acc ^ "\"") lexbuf }
     | end_of_line   { callback acc lexbuf }
     | 'c' (blank_space | end_of_line) *     { callback acc lexbuf }
     | octals as o   { callback (acc ^ (String.make 1 (char_of_int (

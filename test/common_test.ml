@@ -23,8 +23,6 @@ let common_test_suite =
         [
             (* Tokens *)
             string_of_token (INT 7),        "INT 7";
-            string_of_token (FLOAT 7.0),    "FLOAT 7.";
-            string_of_token (STRING "\n"),  "STRING \"\\n\"";
             string_of_token (ATOM "\t"),    "ATOM \"\\t\"";
             string_of_token (VAR "FOO"),    "VAR \"FOO\"";
             string_of_token RULE,           "RULE";
@@ -39,20 +37,15 @@ let common_test_suite =
                 ATOM "cat"; LPAREN; ATOM "tom"; RPAREN; PERIOD
             ], "[ATOM \"cat\"; LPAREN; ATOM \"tom\"; RPAREN; PERIOD]";
 
-            (* Constants *)
-            string_of_const (IntConst (-3)),    "IntConst -3";
-            string_of_const (FloatConst 27.3),  "FloatConst 27.3";
-            string_of_const (StringConst "\n"), "StringConst \"\\n\"";
-
             (* Expressions *)
             string_of_exp (VarExp "X"),             "VarExp \"X\"";
-            string_of_exp (ConstExp (IntConst 5)),  "ConstExp (IntConst 5)";
+            string_of_exp (IntExp 5),  "IntExp 5";
             string_of_exp (
                 TermExp ("coord", [VarExp "X"; VarExp "Y"; VarExp "Z"])
             ), "TermExp (\"coord\", [VarExp \"X\"; VarExp \"Y\"; VarExp \"Z\"])";
             string_of_exp_list (
-                [VarExp "X"; ConstExp (IntConst 10); TermExp ("blah", [VarExp "Y"; ConstExp (StringConst "hi"); TermExp ("end", [])])]
-            ), "[VarExp \"X\"; ConstExp (IntConst 10); TermExp (\"blah\", [VarExp \"Y\"; ConstExp (StringConst \"hi\"); TermExp (\"end\", [])])]";
+                [VarExp "X";  IntExp 10; TermExp ("blah", [VarExp "Y"; TermExp ("end", [])])]
+            ), "[VarExp \"X\"; IntExp 10; TermExp (\"blah\", [VarExp \"Y\"; TermExp (\"end\", [])])]";
 
 
             (* Declarations *)
@@ -74,14 +67,9 @@ let common_test_suite =
                 Query ([TermExp ("bar", [])])
                ]; "print_db"), "print_db";
 
-            (* Readable Constant Strings *)
-            readable_string_of_const (IntConst (-3)),    "-3";
-            readable_string_of_const (FloatConst 27.3),  "27.3";
-            readable_string_of_const (StringConst "\n"), "\"\\n\"";
-
             (* Readable Expression Strings *)
             readable_string_of_exp (VarExp "X"),             "X";
-            readable_string_of_exp (ConstExp (IntConst 5)),  "5";
+            readable_string_of_exp ( IntExp 5),  "5";
             readable_string_of_exp (
                 TermExp ("coord", [VarExp "X"; VarExp "Y"; VarExp "Z"])
             ), "coord(X, Y, Z)";
@@ -99,15 +87,15 @@ let common_test_suite =
             ), "[(VarExp \"X\", TermExp (\"hah\", []))]";
 
             string_of_subs (
-                [(VarExp "X", TermExp ("hah", [])); (VarExp "Y", ConstExp (IntConst 10))]
-            ), "[(VarExp \"X\", TermExp (\"hah\", [])); (VarExp \"Y\", ConstExp (IntConst 10))]";
+                [(VarExp "X", TermExp ("hah", [])); (VarExp "Y",  IntExp 10)]
+            ), "[(VarExp \"X\", TermExp (\"hah\", [])); (VarExp \"Y\", IntExp 10)]";
 
             string_of_unify_res (
                 None
             ), "None";
 
             string_of_unify_res (
-                Some([(VarExp "X", TermExp ("hah", [])); (VarExp "Y", ConstExp (IntConst 10))])
-            ), "[(VarExp \"X\", TermExp (\"hah\", [])); (VarExp \"Y\", ConstExp (IntConst 10))]";
+                Some([(VarExp "X", TermExp ("hah", [])); (VarExp "Y",  IntExp 10)])
+            ), "[(VarExp \"X\", TermExp (\"hah\", [])); (VarExp \"Y\", IntExp 10)]";
         ]
     )

@@ -13,12 +13,13 @@ let try_parse s =
     try Some (parse s) with
     | Error -> None
 
+(* TODO - add arithmetic stuff in here, and remove stuff that's no longer relevant *)
 (* String conversion functions *)
 let string_of_token t =
     match t with
     | INT    i -> "INT "      ^ string_of_int i
-    | FLOAT  f -> "FLOAT "    ^ string_of_float f
-    | STRING s -> "STRING \"" ^ String.escaped s ^ "\""
+    (* | FLOAT  f -> "FLOAT "    ^ string_of_float f *)
+    (* | STRING s -> "STRING \"" ^ String.escaped s ^ "\"" *)
     | ATOM   a -> "ATOM \""   ^ String.escaped a ^ "\""
     | VAR    v -> "VAR \""    ^ v ^ "\""
     | RULE     -> "RULE"
@@ -28,24 +29,34 @@ let string_of_token t =
     | RPAREN   -> "RPAREN"
     | COMMA    -> "COMMA"
     | EOF      -> "EOF"
+    | PLUS     -> "PLUS"
+    | MINUS    -> "MINUS"
 
 let string_of_token_list tl =
     "[" ^ (String.concat "; " (List.map string_of_token tl)) ^ "]"
 
-let string_of_const c =
-    match c with
-    | IntConst    i -> "IntConst "      ^ string_of_int i
-    | FloatConst  f -> "FloatConst "    ^ string_of_float f
-    | StringConst s -> "StringConst \"" ^ String.escaped s ^ "\""
+let string_of_arithmetic (op : arithmetic_operator) a1 a2 =
+  let op_string =
+    match op with
+    | PLUS -> "PLUS"
+    | MINUS -> "MINUS"
+      in
+  let a_to_string a =
+    match a with
+    | ArithmeticInt i -> "ArithmeticInt " ^ string_of_int i
+    | ArithmeticVar v -> "ArithmeticVar \"" ^ v ^ "\""
+  in
+  "Arithmetic (" ^ op_string ^ ", " ^ (a_to_string a1) ^ ", " ^ (a_to_string a2) ^ ")"
 
 let rec string_of_exp e =
     match e with
     | VarExp v   -> "VarExp \"" ^ v ^ "\""
-    | ConstExp c -> "ConstExp (" ^ (string_of_const c) ^ ")"
+    | IntExp i   -> "IntExp " ^ string_of_int i
     | TermExp (f, args) ->
         let func = String.escaped f in
             "TermExp (\"" ^ func ^ "\", [" ^
                 (String.concat "; " (List.map string_of_exp args)) ^ "])"
+    | ArithmeticExp (op, a1, a2) -> string_of_arithmetic op a1 a2
 
 
 let string_of_exp_list g =
@@ -79,17 +90,24 @@ let string_of_unify_res s =
     | Some l -> string_of_subs l
 
 (* Convert ConstExp to a readable string *)
-let readable_string_of_const c =
-    match c with
-    | IntConst    i -> string_of_int i
-    | FloatConst  f -> string_of_float f
-    | StringConst s -> "\"" ^ String.escaped s ^ "\""
+let readable_string_of_arithmetic (op : arithmetic_operator) a1 a2 =
+  let op_string =
+    match op with
+    | PLUS -> " + "
+    | MINUS -> " - "
+  in
+  let a_to_string a =
+    match a with
+    | ArithmeticInt i -> "ArithmeticInt " ^ string_of_int i
+    | ArithmeticVar v -> "ArithmeticVar \"" ^ v ^ "\""
+  in
+   (a_to_string a1) ^ op_string  ^ (a_to_string a2)
 
 (* Convert exp to a readable string *)
 let rec readable_string_of_exp e =
     match e with
     | VarExp   v     -> v
-    | ConstExp c     -> readable_string_of_const c
+    | IntExp   i     -> string_of_int i
     | TermExp (s, l) ->
         s ^ (
             if List.length l > 0
@@ -100,6 +118,9 @@ let rec readable_string_of_exp e =
             ) ^ ")"
             else ""
         )
+    | ArithmeticExp (op, a1, a2) ->
+      readable_string_of_arithmetic op a1 a2
+
 
 (* Print a db *)
 let print_db db =

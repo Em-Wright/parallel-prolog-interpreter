@@ -49,37 +49,6 @@ let lexer_test_suite =
             "39",       [INT 39];
             "-320",     [INT (-320)];
 
-            "3.2",      [FLOAT 3.2];
-            "0.345",    [FLOAT 0.345];
-            "12.0",     [FLOAT 12.0];
-            "+9.8",     [FLOAT (+9.8)];
-            "-5.6",     [FLOAT (-5.6)];
-
-            "3.3e4",    [FLOAT 3.3e4];
-            "3.3E4",    [FLOAT 3.3E4];
-            "3e4",      [FLOAT 3e4];
-            "3E4",      [FLOAT 3E4];
-            "-7.5e-54", [FLOAT (-7.5e-54)];
-
-            "1.0Inf",   [FLOAT infinity];
-            "5.3Inf",   [FLOAT infinity];
-            "-1.0Inf",  [FLOAT neg_infinity];
-            "-2.4Inf",  [FLOAT neg_infinity];
-
-            (* Strings *)
-            "\"Hello, World!\"",                [STRING "Hello, World!"];
-            "\"Hello,\" \"World!\"",            [STRING "Hello,World!"];
-            "\"really long\\nwrapped line\"",   [STRING "really long\nwrapped line"];
-            "\"I'm can't\"",                    [STRING "I'm can't"];
-            "\"foo\\\"'bar\"",                  [STRING "foo\"'bar"];
-            "\" \\t\\n \"",                     [STRING " \t\n "];
-            "\"\\a\\b\\f\\n\\r\\t\\v\\e\\d\"",  [STRING "\007\b\012\n\r\t\011\027\127"];
-            "\"\\\\\"",                         [STRING "\\"];
-            "\"\\\n\"",                         [STRING ""];
-            "\"\\c   \n   \n  \"",              [STRING ""];
-            "\"\\125\\111\\125\\103\"",         [STRING "UIUC"];
-            "\"\\x43\\\\x53\\\"",               [STRING "CS"];
-
             (* Variables *)
             "Cats",     [VAR "Cats"];
             "_dogs",    [VAR "_dogs"];
@@ -92,6 +61,8 @@ let lexer_test_suite =
             "(",        [LPAREN];
             ")",        [RPAREN];
             ",",        [COMMA];
+            "+",        [PLUS];
+            "-",        [MINUS];
             ":- ?- ()", [RULE; QUERY; LPAREN; RPAREN];
 
             (* Comments *)
@@ -125,6 +96,8 @@ let lexer_test_suite =
             "?-cat(X).", [
                 QUERY; ATOM "cat"; LPAREN; VAR "X"; RPAREN; PERIOD
             ];
+            "maths(X, Y) :- is(Y, X + 1)",
+            [ATOM "maths"; LPAREN; VAR "X"; COMMA; VAR "Y"; RPAREN; RULE; ATOM "is"; LPAREN; VAR "Y"; COMMA; VAR "X"; PLUS; INT 1; RPAREN];
             "sibling(X, Y) :- parent_child(Z, X), parent_child(Z, Y).", [
                 ATOM "sibling";      LPAREN; VAR "X"; COMMA; VAR "Y"; RPAREN; RULE;
                 ATOM "parent_child"; LPAREN; VAR "Z"; COMMA; VAR "X"; RPAREN; COMMA;

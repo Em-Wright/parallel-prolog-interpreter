@@ -37,13 +37,13 @@ let evaluator_test_suite =
             (* Finding variables in declarations *)
             (string_of_exp_list
                 (find_vars
-                    ([VarExp "X"; ConstExp(IntConst 10); TermExp("blah",[])])
+                    ([VarExp "X"; IntExp 10; TermExp("blah",[]); ArithmeticExp (PLUS, (ArithmeticVar "Y"), (ArithmeticInt 1))])
                 )
-            ), "[VarExp \"X\"]";
+            ), "[VarExp \"X\"; VarExp \"Y\"]";
 
             (string_of_exp_list
                 (find_vars
-                    ([VarExp "X"; ConstExp(IntConst 10); TermExp("blah",[VarExp "X"; VarExp "Y"])])
+                    ([VarExp "X"; IntExp 10; TermExp("blah",[VarExp "X"; VarExp "Y"])])
                 )
             ), "[VarExp \"X\"; VarExp \"X\"; VarExp \"Y\"]";
 
@@ -70,40 +70,50 @@ let evaluator_test_suite =
             ), "VarExp \"Y\"";
 
             (string_of_exp
+               (sub_lift_goal
+                  ([(VarExp "X", IntExp 7)])
+                  (ArithmeticExp(PLUS, ArithmeticVar "X", ArithmeticInt 1) )
+               )
+            ), "Arithmetic (PLUS, ArithmeticInt 7, ArithmeticInt 1)"
+            ;
+
+            (string_of_exp
                 (sub_lift_goal
                     ([(VarExp "X", VarExp "1")])
-                    (ConstExp(IntConst 10))
+                    (IntExp 10)
                 )
-            ), "ConstExp (IntConst 10)";
+            ), "IntExp 10";
 
             (* Lifting goals with a substitution *)
             (string_of_exp_list
                 (sub_lift_goals
                     ([(VarExp "X", VarExp "1")])
-                    ([VarExp("X"); ConstExp(IntConst 10); TermExp("blah", [VarExp "X"; VarExp "Y"; ConstExp (IntConst 1)])])
+                    ([VarExp("X"); IntExp 10; TermExp("blah", [VarExp "X"; VarExp "Y";IntExp 1]);
+                     ArithmeticExp(PLUS, ArithmeticVar "X", ArithmeticInt 2)])
                 )
-            ), "[VarExp \"1\"; ConstExp (IntConst 10); TermExp (\"blah\", [VarExp \"1\"; VarExp \"Y\"; ConstExp (IntConst 1)])]";
+            ), "[VarExp \"1\"; IntExp 10; TermExp (\"blah\", [VarExp \"1\"; VarExp \"Y\"; IntExp 1]); \
+                Arithmetic (PLUS, ArithmeticVar \"1\", ArithmeticInt 2)]";
 
             (string_of_exp_list
                 (sub_lift_goals
                     ([])
-                    ([VarExp("X"); ConstExp(IntConst 10); TermExp("blah", [VarExp "X"; VarExp "Y"; ConstExp (IntConst 1)])])
+                    ([VarExp("X"); IntExp 10; TermExp("blah", [VarExp "X"; VarExp "Y"; IntExp 1])])
                 )
-            ), "[VarExp \"X\"; ConstExp (IntConst 10); TermExp (\"blah\", [VarExp \"X\"; VarExp \"Y\"; ConstExp (IntConst 1)])]";
+            ), "[VarExp \"X\"; IntExp 10; TermExp (\"blah\", [VarExp \"X\"; VarExp \"Y\"; IntExp 1])]";
 
             (string_of_exp_list
                 (sub_lift_goals
                     ([(VarExp "X", VarExp "1"); (VarExp "Z", VarExp "blu")])
-                    ([VarExp("X"); ConstExp(IntConst 10); TermExp("blah", [VarExp "X"; VarExp "Y"; ConstExp (IntConst 1)])])
+                    ([VarExp("X"); IntExp 10; TermExp("blah", [VarExp "X"; VarExp "Y"; IntExp 1])])
                 )
-            ), "[VarExp \"1\"; ConstExp (IntConst 10); TermExp (\"blah\", [VarExp \"1\"; VarExp \"Y\"; ConstExp (IntConst 1)])]";
+            ), "[VarExp \"1\"; IntExp 10; TermExp (\"blah\", [VarExp \"1\"; VarExp \"Y\"; IntExp 1])]";
 
             (* Renaming variables in a declaration*)
             (string_of_dec
                 (rename_vars_in_dec
-                    (Clause(TermExp("age",[TermExp("zaid",[]);ConstExp(IntConst 10) ]), [(ConstExp (IntConst 1))]))
+                    (Clause(TermExp("age",[TermExp("zaid",[]);IntExp 10 ]), [(IntExp 1)]))
                 )
-            ), "Clause (TermExp (\"age\", [TermExp (\"zaid\", []); ConstExp (IntConst 10)]), [ConstExp (IntConst 1)])";
+            ), "Clause (TermExp (\"age\", [TermExp (\"zaid\", []); IntExp 10]), [IntExp 1])";
 
             (turn_to_unit (reset());
              string_of_dec
@@ -121,11 +131,13 @@ let evaluator_test_suite =
             (turn_to_unit (reset());
              string_of_dec
                 (rename_vars_in_dec
-                    (Query ([TermExp ("parent", [VarExp "X"; VarExp "Y"]); TermExp ("male", [VarExp "X"])]))
+                    (Query ([TermExp ("parent", [VarExp "X"; VarExp "Y"]); TermExp ("male", [VarExp "X"]);
+                            ArithmeticExp(PLUS, ArithmeticVar "X", ArithmeticVar "Z")]))
                 )
-            ), "Query ([TermExp (\"parent\", [VarExp \"2\"; VarExp \"1\"]); TermExp (\"male\", [VarExp \"2\"])])";
+            ), "Query ([TermExp (\"parent\", [VarExp \"3\"; VarExp \"2\"]); TermExp (\"male\", [VarExp \"3\"]); Arithmetic (PLUS, ArithmeticVar \"3\", ArithmeticVar \"1\")])";
 
             (* Pairandcat function for handling decompose case of unification *)
+            (* TODO - do I need to add cases for arithmetic expressions in here? *)
             (string_of_subs
                 (pairandcat
                     ([TermExp ("trude", []); TermExp ("sally", [])])
@@ -138,24 +150,24 @@ let evaluator_test_suite =
                 (pairandcat
                     ([])
                     ([])
-                    ([(VarExp "Z", ConstExp(IntConst 10))])
+                    ([(VarExp "Z", IntExp 10)])
                 )
-            ), "[(VarExp \"Z\", ConstExp (IntConst 10))]";
+            ), "[(VarExp \"Z\", IntExp 10)]";
 
             (string_of_subs
                 (pairandcat
                     ([TermExp ("trude", []); TermExp ("sally", [])])
                     ([VarExp "X"; VarExp "Y"])
-                    ([(VarExp "Z", ConstExp(IntConst 10))])
+                    ([(VarExp "Z", IntExp 10)])
                 )
-            ), "[(TermExp (\"sally\", []), VarExp \"Y\"); (TermExp (\"trude\", []), VarExp \"X\"); (VarExp \"Z\", ConstExp (IntConst 10))]";
+            ), "[(TermExp (\"sally\", []), VarExp \"Y\"); (TermExp (\"trude\", []), VarExp \"X\"); (VarExp \"Z\", IntExp 10)]";
 
             (try
                 string_of_subs
                     (pairandcat
                         ([VarExp "X"; VarExp "Y"])
                         ([])
-                        ([(VarExp "Z", ConstExp(IntConst 10))])
+                        ([(VarExp "Z", IntExp 10)])
                     )
              with Failure s -> s
             ), "sargs and targs should be the same length";
@@ -165,32 +177,33 @@ let evaluator_test_suite =
                     (pairandcat
                         ([])
                         ([VarExp "X"; VarExp "Y"])
-                        ([(VarExp "Z", ConstExp(IntConst 10))])
+                        ([(VarExp "Z", IntExp 10)])
                     )
              with Failure s -> s
             ), "sargs and targs should be the same length";
 
             (* replace function for the elimination case of unification *)
+            (* TODO - do I need to add cases for arithmetic expressions in here? *)
             (string_of_subs
                 (replace
-                    ([(VarExp "Z", ConstExp(IntConst 10))])
+                    ([(VarExp "Z", IntExp 10)])
                     ([])
                 )
-            ), "[(VarExp \"Z\", ConstExp (IntConst 10))]";
+            ), "[(VarExp \"Z\", IntExp 10)]";
 
             (string_of_subs
                 (replace
-                    ([(VarExp "Z", ConstExp(IntConst 10))])
+                    ([(VarExp "Z", IntExp 10)])
                     ([(VarExp "X", VarExp "1")])
                 )
-            ), "[(VarExp \"Z\", ConstExp (IntConst 10))]";
+            ), "[(VarExp \"Z\", IntExp 10)]";
 
             (string_of_subs
                 (replace
-                    ([(VarExp "Z", ConstExp(IntConst 10))])
+                    ([(VarExp "Z", IntExp 10)])
                     ([(VarExp "Z", VarExp "1")])
                 )
-            ), "[(VarExp \"1\", ConstExp (IntConst 10))]";
+            ), "[(VarExp \"1\", IntExp 10)]";
 
             (string_of_subs
                 (replace
@@ -208,16 +221,16 @@ let evaluator_test_suite =
 
             (string_of_subs
                 (replace
-                    ([(VarExp "Z", ConstExp(IntConst 10)); (VarExp "X", TermExp("blah", [VarExp "X"; VarExp "Z"]))])
+                    ([(VarExp "Z", IntExp 10); (VarExp "X", TermExp("blah", [VarExp "X"; VarExp "Z"]))])
                     ([(VarExp "Z", VarExp "1"); (VarExp "X", TermExp("and",[]))])
                 )
-            ), "[(VarExp \"1\", ConstExp (IntConst 10)); (TermExp (\"and\", []), TermExp (\"blah\", [TermExp (\"and\", []); VarExp \"1\"]))]";
+            ), "[(VarExp \"1\", IntExp 10); (TermExp (\"and\", []), TermExp (\"blah\", [TermExp (\"and\", []); VarExp \"1\"]))]";
 
             (* occurs function for elimination case of unification *)
             (string_of_bool
                 (occurs
                     ("1")
-                    (ConstExp(StringConst "name"))
+                    (TermExp ("name", []))
                 )
             ), "false";
 
@@ -238,21 +251,40 @@ let evaluator_test_suite =
             (string_of_bool
                 (occurs
                     ("1")
-                    (TermExp ("1",[VarExp"10"; TermExp("blah", []); ConstExp(IntConst 1)]))
+                    (TermExp ("1",[VarExp"10"; TermExp("blah", []);IntExp 1]))
                 )
             ), "false";
 
             (string_of_bool
                 (occurs
                     ("1")
-                    (TermExp ("1",[VarExp"1"; TermExp("blah", []); ConstExp(IntConst 1)]))
+                    (TermExp ("1",[VarExp"1"; TermExp("blah", []);IntExp 1]))
                 )
             ), "true";
 
             (string_of_bool
+               (occurs
+                  ("1")
+                  (ArithmeticExp (MINUS, ArithmeticVar "1", ArithmeticInt 7))
+               )
+            ), "true";
+            (string_of_bool
+               (occurs
+                  ("1")
+                  (ArithmeticExp (MINUS, ArithmeticInt 1, ArithmeticInt 7))
+               )
+            ), "false";
+            (string_of_bool
+               (occurs
+                  ("1")
+                  (ArithmeticExp (MINUS, ArithmeticVar "X", ArithmeticInt 1))
+               )
+            ), "false";
+
+            (string_of_bool
                 (occurs
                     ("1")
-                    (TermExp ("1",[VarExp"10"; TermExp("blah", [VarExp "1"]); ConstExp(IntConst 1)]))
+                    (TermExp ("1",[VarExp"10"; TermExp("blah", [VarExp "1"]);IntExp 1]))
                 )
             ), "true";
 
@@ -271,7 +303,7 @@ let evaluator_test_suite =
 
             (string_of_unify_res
                 (unify
-                    ([(ConstExp (IntConst 10), ConstExp (IntConst 10))])
+                    ([( IntExp 10, IntExp 10)])
                 )
              ), "[]";
 
@@ -280,6 +312,27 @@ let evaluator_test_suite =
                     ([(VarExp "X", TermExp("blah", [VarExp "X"]))])
                 )
             ), "None";
+            (string_of_unify_res
+               (unify
+                  ([(VarExp "X", ArithmeticExp(PLUS, ArithmeticVar "X", ArithmeticInt 2))])
+               )
+            ), "None";
+
+            (* TODO - what should the unification behaviour be if we try to substitute an
+            ArithmeticExp for something else (e.g. a VarExp). The above case fails the
+            occurs check, so returns false, but what if it doesn't? I guess we probably should
+            be able to sub arithmetic in place of a variable? e.g. if X is Y + 1, then (X, Y+1)
+            is a valid substitution? Will go with this for now, but should clarify this later *)
+            (string_of_unify_res
+               (unify
+                  ([( ArithmeticExp(PLUS, ArithmeticVar "Y", ArithmeticInt 2)), VarExp "X"])
+               )
+            ), "[(VarExp \"X\", Arithmetic (PLUS, ArithmeticVar \"Y\", ArithmeticInt 2))]";
+            (string_of_unify_res
+               (unify
+                  ([(VarExp "X", ArithmeticExp(PLUS, ArithmeticVar "Y", ArithmeticInt 2))])
+               )
+            ), "[(VarExp \"X\", Arithmetic (PLUS, ArithmeticVar \"Y\", ArithmeticInt 2))]";
 
             (string_of_unify_res
                 (unify
@@ -325,9 +378,9 @@ let evaluator_test_suite =
 
             (string_of_unify_res
                 (unify
-                    ([(TermExp("blah", [ConstExp(IntConst 10)]), TermExp("blah", [VarExp "X"]))])
+                    ([(TermExp("blah", [IntExp 10]), TermExp("blah", [VarExp "X"]))])
                 )
-            ), "[(VarExp \"X\", ConstExp (IntConst 10))]";
+            ), "[(VarExp \"X\", IntExp 10)]";
 
             (string_of_unify_res
                 (unify
@@ -337,25 +390,25 @@ let evaluator_test_suite =
 
             (string_of_unify_res
                 (unify
-                    ([(TermExp("blah", [VarExp "X"]), ConstExp(IntConst 10))])
+                    ([(TermExp("blah", [VarExp "X"]), IntExp 10)])
                 )
             ), "None";
 
             (string_of_unify_res
                 (unify
-                    ([(ConstExp (IntConst 10), TermExp("blah", []))])
+                    ([( IntExp 10, TermExp("blah", []))])
                 )
             ), "None";
 
             (string_of_unify_res
                 (unify
-                    ([(ConstExp (IntConst 10), VarExp "X")])
+                    ([( IntExp 10, VarExp "X")])
                 )
-            ), "[(VarExp \"X\", ConstExp (IntConst 10))]";
+            ), "[(VarExp \"X\", IntExp 10)]";
 
             (string_of_unify_res
                 (unify
-                    ([(ConstExp (IntConst 10), ConstExp (IntConst 100))])
+                    ([( IntExp 10,  (IntExp 100))])
                 )
             ), "None";
 
@@ -479,7 +532,8 @@ let evaluator_test_suite =
                 (eval_query
                     (
                         [TermExp ("male", [TermExp ("elizabeth", [])])],
-                        [Query([TermExp ("male", [TermExp ("elizabeth", [])])]); Clause (TermExp("female", [TermExp("elizabeth", [])]), [TermExp("true", [])])],
+                        [Query([TermExp ("male", [TermExp ("elizabeth", [])])]);
+                         Clause (TermExp("female", [TermExp("elizabeth", [])]), [TermExp("true", [])])],
                         []
                     )
                 )
@@ -503,7 +557,8 @@ let evaluator_test_suite =
                 (eval_query
                     (
                         [TermExp("age", [TermExp("zaid",[]); VarExp "Y"])],
-                        [Clause (TermExp ("age", [ConstExp (StringConst "adam"); ConstExp (IntConst 10)]), [TermExp ("true", [])])],
+                        [Clause (TermExp ("age", [ TermExp ("adam", []);
+                              IntExp 10]), [TermExp ("true", [])])],
                         []
                     )
                 )
@@ -511,35 +566,46 @@ let evaluator_test_suite =
                 1
             ), "false\n";
 
-            (string_of_res
-                (eval_query
-                    (
-                        [TermExp("age", [TermExp("zaid",[]); VarExp "Y"])],
-                        [Clause (TermExp ("age", [ConstExp (StringConst "adam"); ConstExp (IntConst 10)]), [TermExp ("true", [])]);Clause (TermExp ("age", [TermExp ("zaid", []); ConstExp (IntConst 5)]), [TermExp ("true", [])])],
-                        []
-                    )
-                )
-                [VarExp "Y"]
-                1
-            ), "====================\nY = 5\n====================\ntrue\n";
+            (* TODO - add cases in here involving arithmetic. Also should write a set of tests
+            for the function perform_arithmetic, even though it's not too complex *)
+
+            (* (string_of_res *)
+            (*     (eval_query *)
+            (*         ( *)
+            (*           [TermExp("nat", [IntExp 0])], *)
+            (*           [ *)
+            (*               Clause (TermExp("nat", [IntExp 0]), [TermExp("true", [])]); *)
+            (*           Clause (TermExp("nat", [VarExp "X"]), [ *)
+            (*               TermExp("nat", [VarExp "Y"]); *)
+            (*               TermExp("is", [ VarExp "X"; ArithmeticExp(PLUS, ArithmeticVar "Y", ArithmeticInt 1)]) *)
+            (*            ]) *)
+            (*          ], *)
+            (*          [] *)
+            (*         ) *)
+            (*     ) *)
+            (*     [] *)
+            (*     0 *)
+            (* ), "====================\nY = 5\n====================\ntrue\n"; *)
 
             (string_of_res
                 (eval_query
                     (
                         [TermExp("age", [VarExp "E"; VarExp "Z"])],
-                        [Clause (TermExp ("age", [ConstExp (StringConst "adam"); ConstExp (IntConst 10)]), [TermExp ("true", [])]);Clause (TermExp ("age", [TermExp ("zaid", []); ConstExp (IntConst 5)]), [TermExp ("true", [])])],
+                        [Clause (TermExp ("age", [TermExp ("adam", []);
+                              IntExp 10]), [TermExp ("true", [])]);Clause (TermExp ("age", [TermExp ("zaid", []);  (IntExp 5)]), [TermExp ("true", [])])],
                         []
                     )
                 )
                 [VarExp "Z"; VarExp "E"]
                 2
-            ), "====================\nE = zaid\nZ = 5\n====================\n====================\nE = \"adam\"\nZ = 10\n====================\ntrue\n";
+            ), "====================\nE = zaid\nZ = 5\n====================\n====================\nE = adam\nZ = 10\n====================\ntrue\n";
 
             (string_of_res
                 (eval_query
                     (
-                        [TermExp("age", [VarExp "X"; ConstExp (IntConst 5)])],
-                        [Clause (TermExp ("age", [ConstExp (StringConst "adam"); ConstExp (IntConst 10)]), [TermExp ("true", [])]);Clause (TermExp ("age", [TermExp ("zaid", []); ConstExp (IntConst 5)]), [TermExp ("true", [])])],
+                        [TermExp("age", [VarExp "X";  (IntExp 5)])],
+                        [Clause (TermExp ("age", [TermExp ("adam", []);
+                            IntExp 10]), [TermExp ("true", [])]);Clause (TermExp ("age", [TermExp ("zaid", []);  (IntExp 5)]), [TermExp ("true", [])])],
                         []
                     )
                 )
@@ -563,7 +629,7 @@ let evaluator_test_suite =
                 (eval_query
                     (
                         [TermExp("age", [VarExp "X"; VarExp "Y"]); TermExp("female", [VarExp "X"])],
-                        [Clause (TermExp ("age", [ConstExp (StringConst "adam"); ConstExp (IntConst 10)]), [TermExp ("true", [])]);Clause (TermExp ("age", [TermExp ("zaid", []); ConstExp (IntConst 5)]), [TermExp ("true", [])]); Clause (TermExp ("age", [TermExp ("ann", []); ConstExp (IntConst 12)]), [TermExp ("true", [])]); Clause (TermExp ("male", [TermExp ("zaid", [])]), [TermExp ("true", [])]); Clause (TermExp ("male", [ConstExp (StringConst "adam")]), [TermExp ("true", [])]); Clause (TermExp ("female", [TermExp ("ann",[])]),[TermExp ("true", [])])],
+                        [Clause (TermExp ("age", [ TermExp("adam", []); IntExp 10]), [TermExp ("true", [])]);Clause (TermExp ("age", [TermExp ("zaid", []);  (IntExp 5)]), [TermExp ("true", [])]); Clause (TermExp ("age", [TermExp ("ann", []);  (IntExp 12)]), [TermExp ("true", [])]); Clause (TermExp ("male", [TermExp ("zaid", [])]), [TermExp ("true", [])]); Clause (TermExp ("male", [ TermExp("adam", [])]), [TermExp ("true", [])]); Clause (TermExp ("female", [TermExp ("ann",[])]),[TermExp ("true", [])])],
                         []
                     )
                 )
@@ -639,7 +705,7 @@ let evaluator_test_suite =
                         []
                     )
                 )
-                [VarExp "Z"; VarExp "Y"; VarExp "X"; ConstExp(IntConst 10); TermExp("blah", [])]
+                [VarExp "Z"; VarExp "Y"; VarExp "X"; IntExp 10; TermExp("blah", [])]
                 3
             ), "====================\nX = tom\nY is free\nZ is free\n====================\ntrue\n";
 
@@ -651,7 +717,7 @@ let evaluator_test_suite =
                         [(VarExp "X", TermExp("eh",[VarExp "X"]))]
                     )
                 )
-                [VarExp "Z"; VarExp "Y"; VarExp "X"; ConstExp(IntConst 10); TermExp("blah", [])]
+                [VarExp "Z"; VarExp "Y"; VarExp "X"; IntExp 10; TermExp("blah", [])]
                 3
             ), "false\n";
 

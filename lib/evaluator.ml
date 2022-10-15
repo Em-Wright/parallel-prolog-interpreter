@@ -1,6 +1,8 @@
 open Ast
 open Common
 
+exception FAILED_SUBSTITUTION of string
+
 
 (*
    fresh:
@@ -30,8 +32,14 @@ let rec find_vars q  =
     | (x :: xs) -> (
         match x with
         | VarExp _ -> x :: (find_vars xs)
-        | ConstExp _ -> (find_vars xs)
+        | IntExp _ -> (find_vars xs)
         | TermExp (_, el) -> (find_vars el) @ (find_vars xs)
+        | ArithmeticExp (_, e1, e2) ->
+          match e1,e2 with
+          | ArithmeticVar v1, ArithmeticVar v2 -> (VarExp v1)::((VarExp v2):: (find_vars xs))
+          | _, ArithmeticVar v2 -> (VarExp v2):: (find_vars xs)
+          | ArithmeticVar v1, _ -> (VarExp v1):: (find_vars xs)
+          | _ -> (find_vars xs)
     )
 
 (*
@@ -41,13 +49,58 @@ let rec find_vars q  =
      * returns the list reversed with only one copy of each element
   adapted from https://rosettacode.org/wiki/Remove_duplicate_elements#OCaml
 *)
+
+(* TODO - might be a better way of doing this. Definitely a better way if we're not fussy
+about the resulting order - Core.List.dedup_and_sort would work *)
 let uniq l =
     let rec tail_uniq a l =
         match l with
         | [] -> a
         | hd :: tl ->
-            tail_uniq (hd :: a) (List.filter (fun x -> (x <> hd) ) tl) in
-            tail_uniq [] l
+            tail_uniq (hd :: a) (List.filter (fun x -> (x <> hd) ) tl)
+    in
+    tail_uniq [] l
+
+
+(* TODO - add comment here to explain purpose of function, or merge it into the
+main sub_lift_goal function - it's unlikely to get used anywhere else, so there's
+not much point in trying to keep things separate here *)
+let sub_lift_goal_arithmetic sub a =
+  match a with
+  | ArithmeticVar v -> (
+      (* if this variable has a substitution do the substitution *)
+      (* TODO - the types of the substitutions are going to be expressions.
+         We want to return an arithmetic_operand, so we need to interpret
+         the substitution as such. If the exp doesn't fit into an
+         arithmetic_operand, then we raise an error, since we shouldn't get
+         into a state where we're substituting terms into an arithmetic expression.
+
+         The fact that it can't be substituted should be caught in the unify function,
+         which would check the substitutions are valid. It's annoying that we can't use the
+         type system to rule it out, however.
+
+         Actually, if we're unifying the variable with a term before we get to this goal, it's
+         very possible we'll have a term being substituted in for a variable
+         in an arithmetic expression. So we want the unify function to catch this
+         exception?
+      *)
+      try let i = List.assoc (VarExp v) sub in
+        match i with
+        | IntExp i2 -> ArithmeticInt i2
+        | VarExp v2 -> ArithmeticVar v2
+        | _ -> raise (FAILED_SUBSTITUTION "Attempted to substitute an ArithmeticExp or a TermExp for a variable in\
+                                          an arithmetic expression. If this has occurred, I've implemented\
+                                          arithmetic wrong. Oops. ")
+      with Not_found -> a
+    )
+  | _ -> a (* This implicity assumes we haven't tried to substitute anything for a constant, so
+           we can probably get away with assuming we haven't tried to substitute a term for
+           a variable in an arithmetic expression. Not quite the same, since we don't know
+              whether or not a variable is in an arithmetic expression at the time we perform
+              the substitution (unless we do? Could add something to check for that? But then
+              we're definitely not gonna have constant time substitution for a variable) so
+              we just need to make sure we have good enough checking at each subsequent step
+           *)
 
 (*
    sub_lift_goal:
@@ -65,10 +118,11 @@ let rec sub_lift_goal sub g =
     )
     | TermExp (s, el) ->
         TermExp (s, List.map (fun g1 -> sub_lift_goal sub g1) el)
+    | ArithmeticExp (op, e1, e2) -> ArithmeticExp(op, sub_lift_goal_arithmetic sub e1, sub_lift_goal_arithmetic sub e2)
     | _  -> g
 
 (*
-   sub_lift_goal:
+   sub_lift_goals:
      * takes in:
          sub - a list of substitutions for variables
          gl - a list of goals each of type exp
@@ -83,6 +137,8 @@ let sub_lift_goals sub gl =
          d - a dec type
      * returns a dec with all the variables in d renamed to fresh variable names
 *)
+
+(* TODO - this doesn't work for arithmetic expressions *)
 let rename_vars_in_dec d =
     match d with
     | Clause (h, b) ->
@@ -115,6 +171,9 @@ let rename_vars_in_dec d =
      * used for implementing decompose for unification
      * sargs and targs must be the same length, otherwise an exception is thrown
 *)
+
+(* TODO - rewrite this to use pattern matching to raise Failure, rather than
+using List.length *)
 let rec pairandcat sargs targs c =
     match sargs with
     | [] -> (
@@ -154,6 +213,13 @@ let rec occurs n t =
      | VarExp m -> n = m
      | TermExp (_, el) ->
         List.fold_left (fun acc v -> acc || (occurs n v)) false el
+     | ArithmeticExp (_, e1, e2) ->(
+       match e1, e2 with
+       | ArithmeticVar v1, ArithmeticVar v2 -> n = v1 || n = v2
+       | ArithmeticVar v1, _ -> n = v1
+       | _, ArithmeticVar v2 -> n = v2
+       | _ -> false
+     )
      | _ -> false
 
 (*
@@ -167,6 +233,7 @@ let rec occurs n t =
 *)
 
 (* John suggested considering the language guarantee that unifying a variable with anything is O(1) *)
+
 let rec unify constraints =
     match constraints with
     | [] -> Some []
@@ -179,6 +246,13 @@ let rec unify constraints =
                 (* Eliminate *)
                 if (occurs n t)
                 then None
+                  (* If the var n does not occur in expression t, then
+                  generate c'', the new set of constraints with this
+                  substitution t for s applied. Then attempt to unify
+                  this new set of constraints. If that works, then
+                  our substitution (s,t) is valid, and so we add it to
+                  the front of the resulting unifier list, with any
+                  relevant substitutions applied *)
                 else let sub = [(s,t)] in
                      let c'' = replace c' sub in
                      let phi = unify c'' in (
@@ -197,13 +271,23 @@ let rec unify constraints =
                     else None
                 | _ -> None
             )
-            | _ -> (
+            (* Arithmetic expressions should not be substituted with anything else *)
+            | _ -> ( (* Otherwise, we have s is an int or arithmetic expression, so we
+                        can only unify it if t is a variable, and the unification needs
+                        to be the other way round
+                     *)
                 match t with
                 (* Orient *)
                 | VarExp _ -> unify ((t, s) :: c')
                 | _ -> None
             )
         )
+
+
+let perform_arithmetic (op : arithmetic_operator) i1 i2 : exp =
+  match op with
+  | PLUS ->  IntExp (i1 + i2)
+  | MINUS -> IntExp (i1 - i2)
 
 (*
    eval_query:
@@ -241,12 +325,64 @@ let rec eval_query (q, db, env) =
               db,
               env
             )
-        )   
+        )
+        | TermExp("is", [lhs; rhs]) -> (
+          (* evaluate the arithmetic expressions with current substitutions, then check if it is
+             possible to unify them with any additional substitutions *)
+              match lhs with
+                | VarExp _ -> (
+                  match rhs with
+                  | ArithmeticExp (op, t1, t2) -> (
+                      match t1, t2 with
+                      | ArithmeticInt i1, ArithmeticInt i2 ->
+                        (* TODO - possibly ought to perform substitutions beforehand?
+                           So that any variables are initialised. Not sure if this is already done
+                           by this point, or if we need to do it again. I think it should
+                           already be done, since we call sub_lift_goals whenever we recursively
+                           call eval_query
+                        *)
+                        let result = perform_arithmetic op i1 i2 in
+                          (
+                            match unify [(lhs, result)] with
+                            | Some s -> ( match unify (s@env) with
+                                | Some env2 ->
+                                  eval_query (
+                                    sub_lift_goals s gl,
+                                    db,
+                                    env2
+                                  )
+                                | None -> []
+                              )
+                            | None -> []
+                          )
+                      | _ -> []
+                    )
+                  | IntExp _ ->
+                    (
+                    match unify [(lhs, rhs)] with
+                    | Some s -> ( match unify (s@env) with
+                        | Some env2 ->
+                          eval_query (
+                            sub_lift_goals s gl,
+                            db,
+                            env2
+                            )
+                        | None -> []
+                      )
+                    | None -> []
+                  )
+                  | _ -> []
+                )
+                | _ -> []
+                  (* Maybe we actually can have a number as the lhs? Probably not initially, but
+                  once we start instantiating things? We shouldn't be able to do the arithmetic
+                     in reverse, probably, but we can check whether the lhs number evals to the
+                     same as the rhs number. 
+                 *)
+            )
         (* if goal is some other predicate *)
         | TermExp(_,_) -> (
         (* iterate over the db *)
-        (* This kinda looks like it's being done in one pass, but this step is repeated in recursive calls
-          to eval_query *)
         List.fold_right (
             fun rule r -> (
                 match (rename_vars_in_dec rule) with (* rename vars in rule to completely fresh ones *)
@@ -370,6 +506,8 @@ let add_dec_to_db (dec, db) =
         (* don't allow user to add a new definition of true *)
         | TermExp ("true", _) ->
             print_string "Can't reassign true predicate\n"; db
+        | TermExp ("is", _) ->
+          print_string "Can't reassign 'is' predicate\n"; db
         | _ -> dec :: db
     )
     | Query _ -> (

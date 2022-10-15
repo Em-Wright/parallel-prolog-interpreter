@@ -8,7 +8,7 @@ open Evaluator
 (* Try to detect if something is getting piped in *)
 let is_interactive = 0 = (Sys.command "[ -t 0 ]")
 
-let _ =
+let main () =
     (if is_interactive
      then print_endline "\nWelcome to the Prolog Interpreter\n"
      else ()

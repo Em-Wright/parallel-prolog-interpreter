@@ -1,1 +1,2 @@
-let () = print_endline "Hello, World!"
+open Sequential_interpreter.Main
+let () = main ()
