@@ -45,6 +45,12 @@
 %token COMMA      /* ,  */
 %token PLUS
 %token MINUS
+%token MULT
+%token DIV
+%token IS
+%token EQUALS
+%token GT
+%token LT
 
 /* Meta-characters */
 %token EOF
@@ -76,21 +82,30 @@ predicate:
 structure:
     | a = ATOM; LPAREN; RPAREN                          { atom_sugar a }
     | a = ATOM; LPAREN; tl = term_list; RPAREN          { TermExp (a, tl) }
+    | v = VAR; IS; a = arithmetic                       { TermExp ("is", [VarExp v; a]) }
+    | t1 = comparable; EQUALS; t2 = comparable          { TermExp ("equals", [t1; t2]) }
+    | t1 = comparable; GT; t2 = comparable          { TermExp ("greater_than", [t1; t2]) }
+    | t1 = comparable; LT; t2 = comparable          { TermExp ("less_than", [t1; t2]) }
 
 term_list:
     | t = term                                          { [t] }
     | t = term; COMMA; tl = term_list                   { t :: tl }
 
 term:
-    | i = INT                                           { IntExp i }
     | a = ATOM                                          { atom_sugar a }
-    | v = VAR                                           { VarExp v }
     | s = structure                                     { s }
     | a = arithmetic                                    { a }
+    | c = comparable                                    { c }
+
+comparable:
+    | i = INT { IntExp i }
+    | v = VAR { VarExp v }
 
 arithmetic:
     | a1 = arithmetic_operand; PLUS; a2 = arithmetic_operand { ArithmeticExp (PLUS, a1, a2)}
     | a1 = arithmetic_operand; MINUS; a2 = arithmetic_operand { ArithmeticExp (MINUS, a1, a2)}
+    | a1 = arithmetic_operand; MULT; a2 = arithmetic_operand { ArithmeticExp (MULT, a1, a2)}
+    | a1 = arithmetic_operand; DIV; a2 = arithmetic_operand { ArithmeticExp (DIV, a1, a2)}
 
 arithmetic_operand:
     | i = INT                                           { ArithmeticInt i}

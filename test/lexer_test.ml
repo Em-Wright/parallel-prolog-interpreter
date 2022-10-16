@@ -63,6 +63,10 @@ let lexer_test_suite =
             ",",        [COMMA];
             "+",        [PLUS];
             "-",        [MINUS];
+            "*",        [MULT];
+            "/",        [DIV];
+            ">",        [GT];
+            "<",        [LT];
             ":- ?- ()", [RULE; QUERY; LPAREN; RPAREN];
 
             (* Comments *)
@@ -96,8 +100,34 @@ let lexer_test_suite =
             "?-cat(X).", [
                 QUERY; ATOM "cat"; LPAREN; VAR "X"; RPAREN; PERIOD
             ];
-            "maths(X, Y) :- is(Y, X + 1)",
-            [ATOM "maths"; LPAREN; VAR "X"; COMMA; VAR "Y"; RPAREN; RULE; ATOM "is"; LPAREN; VAR "Y"; COMMA; VAR "X"; PLUS; INT 1; RPAREN];
+            "maths(X, Y) :- is(Y, X + 1)", [
+              ATOM "maths"; LPAREN; VAR "X"; COMMA; VAR "Y"; RPAREN; RULE; ATOM "is";
+                    LPAREN; VAR "Y"; COMMA; VAR "X"; PLUS; INT 1; RPAREN
+            ];
+            "maths(X, Y) :- Y is X - 1", [
+              ATOM "maths"; LPAREN; VAR "X"; COMMA; VAR "Y"; RPAREN; RULE; VAR "Y"; IS;
+                    VAR "X"; MINUS; INT 1
+            ];
+            "maths(X, Y) :- Y is X * 1", [
+              ATOM "maths"; LPAREN; VAR "X"; COMMA; VAR "Y"; RPAREN; RULE; VAR "Y"; IS;
+              VAR "X"; MULT; INT 1
+            ];
+            "maths(X, Y) :- Y is X / -1", [
+              ATOM "maths"; LPAREN; VAR "X"; COMMA; VAR "Y"; RPAREN; RULE; VAR "Y"; IS;
+              VAR "X"; DIV; INT (-1)
+            ];
+            "eq(X, Y) :- X = Y", [
+              ATOM "eq"; LPAREN; VAR "X"; COMMA; VAR "Y"; RPAREN; RULE; VAR "X"; EQUALS;
+                        VAR "Y"
+            ];
+            "gt(X, Y) :- X > Y", [
+              ATOM "gt"; LPAREN; VAR "X"; COMMA; VAR "Y"; RPAREN; RULE; VAR "X"; GT;
+              VAR "Y"
+            ];
+            "lt(X, Y) :- X < Y", [
+              ATOM "lt"; LPAREN; VAR "X"; COMMA; VAR "Y"; RPAREN; RULE; VAR "X"; LT;
+              VAR "Y"
+            ];
             "sibling(X, Y) :- parent_child(Z, X), parent_child(Z, Y).", [
                 ATOM "sibling";      LPAREN; VAR "X"; COMMA; VAR "Y"; RPAREN; RULE;
                 ATOM "parent_child"; LPAREN; VAR "Z"; COMMA; VAR "X"; RPAREN; COMMA;

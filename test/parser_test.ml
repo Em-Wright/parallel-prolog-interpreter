@@ -131,8 +131,50 @@ let parser_test_suite =
                                       ArithmeticVar "Y",
                                       ArithmeticInt 1)
                       ])]
-              )
-    ;
+              );
+            "arithmetic_expression_infix(X, Y) :- X is Y * -3.",
+            Clause (
+              TermExp ("arithmetic_expression_infix", [VarExp "X"; VarExp "Y"]),
+              [TermExp ("is", [
+                   VarExp "X";
+                   ArithmeticExp (MULT,
+                                  ArithmeticVar "Y",
+                                  ArithmeticInt (-3))
+                 ])]
+            );
+            "equals_infix(X, Y) :- X = Y.",
+            Clause (
+              TermExp ("equals_infix", [VarExp "X"; VarExp "Y"]),
+              [TermExp ("equals", [
+                   VarExp "X";
+                   VarExp "Y"
+                 ])]
+            );
+            "equals_infix(X) :- X = 2.",
+            Clause (
+              TermExp ("equals_infix", [VarExp "X"]),
+              [TermExp ("equals", [
+                   VarExp "X";
+                   IntExp 2
+                 ])]
+            );
+            "gt(X) :- X > 2.",
+            Clause (
+              TermExp ("gt", [VarExp "X"]),
+              [TermExp ("greater_than", [
+                   VarExp "X";
+                   IntExp 2
+                 ])]
+            );
+            "lt(X) :- X < 2.",
+            Clause (
+              TermExp ("lt", [VarExp "X"]),
+              [TermExp ("less_than", [
+                   VarExp "X";
+                   IntExp 2
+                 ])]
+            );
+
 
             (* Queries *)
             "?- cat(tom).", (

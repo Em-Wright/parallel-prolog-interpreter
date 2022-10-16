@@ -75,10 +75,12 @@ rule token = parse
     | ','               { COMMA     }
     | '+'               { PLUS      }
     | '-'               { MINUS     }
+    | '*'               { MULT      }
+    | '/'               { DIV       }
     | " is "            { IS        }
-    (* | '='               { EQUALS    } *)
-    (* | '>'               { GT        } *)
-    (* | '<'               { LT        } *)
+    | '='               { EQUALS    }
+    | '>'               { GT        }
+    | '<'               { LT        }
 
 and comments count = parse
     | open_comment      { comments (1 + count) lexbuf }

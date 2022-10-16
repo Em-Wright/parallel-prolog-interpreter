@@ -566,26 +566,6 @@ let evaluator_test_suite =
                 1
             ), "false\n";
 
-            (* TODO - add cases in here involving arithmetic. Also should write a set of tests
-            for the function perform_arithmetic, even though it's not too complex *)
-
-            (* (string_of_res *)
-            (*     (eval_query *)
-            (*         ( *)
-            (*           [TermExp("nat", [IntExp 0])], *)
-            (*           [ *)
-            (*               Clause (TermExp("nat", [IntExp 0]), [TermExp("true", [])]); *)
-            (*           Clause (TermExp("nat", [VarExp "X"]), [ *)
-            (*               TermExp("nat", [VarExp "Y"]); *)
-            (*               TermExp("is", [ VarExp "X"; ArithmeticExp(PLUS, ArithmeticVar "Y", ArithmeticInt 1)]) *)
-            (*            ]) *)
-            (*          ], *)
-            (*          [] *)
-            (*         ) *)
-            (*     ) *)
-            (*     [] *)
-            (*     0 *)
-            (* ), "====================\nY = 5\n====================\ntrue\n"; *)
 
             (string_of_res
                 (eval_query
@@ -624,6 +604,106 @@ let evaluator_test_suite =
                 []
                 0
             ), "true\n";
+
+            (* TODO - add cases in here involving arithmetic. Also should write a set of tests
+               for the function perform_arithmetic, even though it's not too complex *)
+
+            (string_of_res
+               (eval_query
+                  (
+                    [TermExp("nat1", [VarExp "Z"])],
+                    [
+                      Clause (TermExp("nat", [IntExp 0]), [TermExp("true", [])]);
+                      Clause (TermExp("nat1", [VarExp "X"]), [
+                          TermExp("nat", [VarExp "Y"]);
+                          TermExp("is", [ VarExp "X"; ArithmeticExp(PLUS, ArithmeticVar "Y", ArithmeticInt 1)])
+                        ])
+                    ],
+                    []
+                  )
+               )
+               [VarExp "Z"]
+               1
+            ), "====================\nZ = 1\n====================\ntrue\n";
+            (string_of_res
+               (eval_query
+                  (
+                    [TermExp("is_ten", [VarExp "Z"])],
+                    [
+                      Clause (TermExp("is_one", [IntExp 1]), [TermExp("true", [])]);
+                      Clause (TermExp("is_ten", [VarExp "X"]), [
+                          TermExp("is_one", [VarExp "Y"]);
+                          TermExp("is", [ VarExp "X"; ArithmeticExp(MULT, ArithmeticVar "Y", ArithmeticInt 10)])
+                        ])
+                    ],
+                    []
+                  )
+               )
+               [VarExp "Z"]
+               1
+            ), "====================\nZ = 10\n====================\ntrue\n";
+            (string_of_res
+               (eval_query
+                  (
+                    [TermExp("is_five", [VarExp "Z"])],
+                    [
+                      Clause (TermExp("is_minus_ten", [IntExp (-10)]), [TermExp("true", [])]);
+                      Clause (TermExp("is_five", [VarExp "X"]), [
+                          TermExp("is_minus_ten", [VarExp "Y"]);
+                          TermExp("is", [ VarExp "X"; ArithmeticExp(DIV, ArithmeticVar "Y",
+                                                                    ArithmeticInt (-2))])
+                        ])
+                    ],
+                    []
+                  )
+               )
+               [VarExp "Z"]
+               1
+            ), "====================\nZ = 5\n====================\ntrue\n";
+            (string_of_res
+               (eval_query
+                  (
+                    [TermExp("nat", [VarExp "Z"])],
+                    [
+                      Clause (TermExp("nat", [VarExp "X"]), [
+                            TermExp("equals", [VarExp "X"; IntExp 0])
+                        ]
+                             );
+                      Clause (TermExp("nat", [VarExp "X"]), [
+                          TermExp("equals", [VarExp "X"; IntExp 7])
+                        ]
+                        )
+                    ],
+                    []
+                  )
+               )
+               [VarExp "Z"]
+               1
+            ), "====================\nZ = 7\n====================\n====================\nZ = 0\n====================\ntrue\n";
+
+
+            (string_of_res
+               (eval_query
+                  (
+                    [TermExp("nat1", [VarExp "Z"])],
+                    [
+                      Clause (TermExp("nat", [IntExp (-2)]), [TermExp("true", [])]);
+                      Clause (TermExp("nat", [IntExp (-1)]), [TermExp("true", [])]);
+                      Clause (TermExp("nat", [IntExp 3]), [TermExp("true", [])]);
+                      Clause (TermExp("nat", [IntExp 5]), [TermExp("true", [])]);
+                      Clause (TermExp("nat", [IntExp 6]), [TermExp("true", [])]);
+                      Clause (TermExp("nat1", [VarExp "X"]), [
+                          TermExp("nat", [VarExp "X"]);
+                          TermExp("less_than", [ VarExp "X"; IntExp 5 ]);
+                          TermExp("greater_than", [ VarExp "X"; IntExp (-2) ])
+                        ])
+                    ],
+                    []
+                  )
+               )
+               [VarExp "Z"]
+               1
+            ), "====================\nZ = 3\n====================\n====================\nZ = -1\n====================\ntrue\n";
 
             (string_of_res
                 (eval_query

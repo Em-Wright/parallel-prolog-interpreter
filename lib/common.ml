@@ -18,8 +18,6 @@ let try_parse s =
 let string_of_token t =
     match t with
     | INT    i -> "INT "      ^ string_of_int i
-    (* | FLOAT  f -> "FLOAT "    ^ string_of_float f *)
-    (* | STRING s -> "STRING \"" ^ String.escaped s ^ "\"" *)
     | ATOM   a -> "ATOM \""   ^ String.escaped a ^ "\""
     | VAR    v -> "VAR \""    ^ v ^ "\""
     | RULE     -> "RULE"
@@ -31,6 +29,12 @@ let string_of_token t =
     | EOF      -> "EOF"
     | PLUS     -> "PLUS"
     | MINUS    -> "MINUS"
+    | MULT     -> "MULT"
+    | DIV      -> "DIV"
+    | IS       -> "IS"
+    | EQUALS   -> "EQUALS"
+    | GT       -> "GT"
+    | LT       -> "LT"
 
 let string_of_token_list tl =
     "[" ^ (String.concat "; " (List.map string_of_token tl)) ^ "]"
@@ -40,6 +44,8 @@ let string_of_arithmetic (op : arithmetic_operator) a1 a2 =
     match op with
     | PLUS -> "PLUS"
     | MINUS -> "MINUS"
+    | MULT     -> "MULT"
+    | DIV      -> "DIV"
       in
   let a_to_string a =
     match a with
@@ -95,6 +101,8 @@ let readable_string_of_arithmetic (op : arithmetic_operator) a1 a2 =
     match op with
     | PLUS -> " + "
     | MINUS -> " - "
+    | MULT     -> " * "
+    | DIV      -> " / "
   in
   let a_to_string a =
     match a with

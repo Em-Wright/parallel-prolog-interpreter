@@ -286,8 +286,10 @@ let rec unify constraints =
 
 let perform_arithmetic (op : arithmetic_operator) i1 i2 : exp =
   match op with
-  | PLUS ->  IntExp (i1 + i2)
+  | PLUS  -> IntExp (i1 + i2)
   | MINUS -> IntExp (i1 - i2)
+  | MULT  -> IntExp (i1 * i2)
+  | DIV   -> IntExp (i1 / i2)
 
 (*
    eval_query:
@@ -326,6 +328,41 @@ let rec eval_query (q, db, env) =
               env
             )
         )
+        (* if the goal is the 'equals' predicate *)
+        | TermExp("equals", [lhs; rhs]) -> (
+            (* check if the lhs and rhs can unify p much *)
+            match unify [(lhs, rhs)] with
+            | Some s -> (
+                match unify (s@env) with
+                | Some env2 ->
+                  (eval_query (
+                      sub_lift_goals s gl,
+                      db,
+                      env2
+                    ))
+                | None -> []
+              )
+            | None -> []
+          )
+        | TermExp("greater_than", [lhs; rhs]) -> (
+          match lhs, rhs with
+          | IntExp i1, IntExp i2 ->
+            if i1 > i2 then
+              eval_query (gl, db, env)
+            else
+              []
+          | _ -> [] (* arguments insufficiently instantiated *)
+        )
+        | TermExp("less_than", [lhs; rhs]) -> (
+          match lhs, rhs with
+          | IntExp i1, IntExp i2 ->
+            if i1 < i2 then
+              eval_query (gl, db, env)
+            else
+              []
+          | _ -> [] (* arguments insufficiently instantiated *)
+        )
+        (* if the goal is the 'is' predicate *)
         | TermExp("is", [lhs; rhs]) -> (
           (* evaluate the arithmetic expressions with current substitutions, then check if it is
              possible to unify them with any additional substitutions *)
@@ -508,6 +545,12 @@ let add_dec_to_db (dec, db) =
             print_string "Can't reassign true predicate\n"; db
         | TermExp ("is", _) ->
           print_string "Can't reassign 'is' predicate\n"; db
+        | TermExp ("equals", _) ->
+          print_string "Can't reassign 'equals' predicate\n"; db
+        | TermExp ("less_than", _) ->
+          print_string "Can't reassign 'less_than' predicate\n"; db
+        | TermExp ("greater_than", _) ->
+          print_string "Can't reassign 'greater_than' predicate\n"; db
         | _ -> dec :: db
     )
     | Query _ -> (
