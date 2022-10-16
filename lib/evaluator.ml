@@ -24,7 +24,7 @@ let (fresh, reset) =
    find_vars:
      * takes in:
          q - a list of exp
-     * returns a list of all VarExp in the list
+     * returns a list of all VarExp (and ArithmeticVar) in the list
 *)
 let rec find_vars q  =
     match q with
@@ -62,28 +62,17 @@ let uniq l =
     tail_uniq [] l
 
 
-(* TODO - add comment here to explain purpose of function, or merge it into the
-main sub_lift_goal function - it's unlikely to get used anywhere else, so there's
-not much point in trying to keep things separate here *)
+(*
+   sub_lift_goal_arithmetic:
+     * takes in:
+         sub - a list of substitutions for variables
+         a - an arithmetic sub-expression
+     * returns the sub-expression with the substitutions applied
+*)
 let sub_lift_goal_arithmetic sub a =
   match a with
   | ArithmeticVar v -> (
       (* if this variable has a substitution do the substitution *)
-      (* TODO - the types of the substitutions are going to be expressions.
-         We want to return an arithmetic_operand, so we need to interpret
-         the substitution as such. If the exp doesn't fit into an
-         arithmetic_operand, then we raise an error, since we shouldn't get
-         into a state where we're substituting terms into an arithmetic expression.
-
-         The fact that it can't be substituted should be caught in the unify function,
-         which would check the substitutions are valid. It's annoying that we can't use the
-         type system to rule it out, however.
-
-         Actually, if we're unifying the variable with a term before we get to this goal, it's
-         very possible we'll have a term being substituted in for a variable
-         in an arithmetic expression. So we want the unify function to catch this
-         exception?
-      *)
       try let i = List.assoc (VarExp v) sub in
         match i with
         | IntExp i2 -> ArithmeticInt i2
@@ -93,14 +82,7 @@ let sub_lift_goal_arithmetic sub a =
                                           arithmetic wrong. Oops. ")
       with Not_found -> a
     )
-  | _ -> a (* This implicity assumes we haven't tried to substitute anything for a constant, so
-           we can probably get away with assuming we haven't tried to substitute a term for
-           a variable in an arithmetic expression. Not quite the same, since we don't know
-              whether or not a variable is in an arithmetic expression at the time we perform
-              the substitution (unless we do? Could add something to check for that? But then
-              we're definitely not gonna have constant time substitution for a variable) so
-              we just need to make sure we have good enough checking at each subsequent step
-           *)
+  | _ -> a
 
 (*
    sub_lift_goal:
@@ -137,8 +119,6 @@ let sub_lift_goals sub gl =
          d - a dec type
      * returns a dec with all the variables in d renamed to fresh variable names
 *)
-
-(* TODO - this doesn't work for arithmetic expressions *)
 let rename_vars_in_dec d =
     match d with
     | Clause (h, b) ->
@@ -305,13 +285,6 @@ let perform_arithmetic (op : arithmetic_operator) i1 i2 : exp =
          - otherwise, each element is a list of substitutions for one solution
            to the query with the given db
 *)
-
-(* Would mainly just be parallelising this function - the rest of the functions are utility functions which
-will be the same across workers. One thing which could be interesting is making sure variables are actually fresh when
-we rename variables in a declaration - if workers are taking jobs from a stack, they are likely to pick up jobs put
-there by other workers, and these may contain variables which this particular worker hasn't generated yet. Not sure
-if this is a problem which can actually occur - will need to check how the substitution works, and I guess it depends
-on how I implement the stack system. Or the work stealing system, if that's the route we're taking. *)
 let rec eval_query (q, db, env) =
     match q with
     | [] -> (
@@ -372,12 +345,6 @@ let rec eval_query (q, db, env) =
                   | ArithmeticExp (op, t1, t2) -> (
                       match t1, t2 with
                       | ArithmeticInt i1, ArithmeticInt i2 ->
-                        (* TODO - possibly ought to perform substitutions beforehand?
-                           So that any variables are initialised. Not sure if this is already done
-                           by this point, or if we need to do it again. I think it should
-                           already be done, since we call sub_lift_goals whenever we recursively
-                           call eval_query
-                        *)
                         let result = perform_arithmetic op i1 i2 in
                           (
                             match unify [(lhs, result)] with
@@ -411,11 +378,6 @@ let rec eval_query (q, db, env) =
                   | _ -> []
                 )
                 | _ -> []
-                  (* Maybe we actually can have a number as the lhs? Probably not initially, but
-                  once we start instantiating things? We shouldn't be able to do the arithmetic
-                     in reverse, probably, but we can check whether the lhs number evals to the
-                     same as the rhs number. 
-                 *)
             )
         (* if goal is some other predicate *)
         | TermExp(_,_) -> (

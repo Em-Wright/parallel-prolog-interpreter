@@ -36,7 +36,7 @@ let main () =
         with
         | Failure s -> ( (* in case of an error *)
             print_newline();
-	    print_endline s;
+	          print_endline s;
             print_newline();
             loop db
         )
