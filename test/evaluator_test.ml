@@ -604,6 +604,33 @@ let evaluator_test_suite =
                 []
                 0
             ), "true\n";
+            (string_of_res
+               (eval_query
+                  (
+                    [TermExp ("prepend", [
+                         IntExp 1;
+                         TermExp ("list", [
+                             IntExp 2;
+                             TermExp ("empty_list", [])
+                           ]);
+                         VarExp "X"
+                       ])],
+                    [
+                      Clause (TermExp ("prepend", [VarExp "H"; VarExp "T";
+                                                   TermExp ("list", [
+                                                       VarExp "H";
+                                                       VarExp "T"
+                                                     ])
+                                                  ]),
+                              [ TermExp ("true", []) ]
+                             )
+                    ],
+                    []
+                  )
+               )
+               [VarExp "X"]
+               1
+            ), "====================\nX = list(1, list(2, empty_list))\n====================\ntrue\n";
 
             (* TODO - add cases in here involving arithmetic. Also should write a set of tests
                for the function perform_arithmetic, even though it's not too complex *)

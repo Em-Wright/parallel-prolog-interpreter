@@ -507,6 +507,10 @@ let add_dec_to_db (dec, db) =
             print_string "Can't reassign true predicate\n"; db
         | TermExp ("is", _) ->
           print_string "Can't reassign 'is' predicate\n"; db
+        | TermExp ("list", _) ->
+          print_string "Can't reassign 'list' predicate\n"; db
+        | TermExp ("empty_list", _) ->
+          print_string "Can't reassign 'empty_list' predicate\n"; db
         | TermExp ("equals", _) ->
           print_string "Can't reassign 'equals' predicate\n"; db
         | TermExp ("less_than", _) ->

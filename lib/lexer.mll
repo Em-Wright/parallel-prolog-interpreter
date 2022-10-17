@@ -72,6 +72,9 @@ rule token = parse
     | '.'               { PERIOD    }
     | '('               { LPAREN    }
     | ')'               { RPAREN    }
+    | '['               { LBRACKET  }
+    | ']'               { RBRACKET  }
+    | '|'               { PIPE      }
     | ','               { COMMA     }
     | '+'               { PLUS      }
     | '-'               { MINUS     }

@@ -35,6 +35,9 @@ let string_of_token t =
     | EQUALS   -> "EQUALS"
     | GT       -> "GT"
     | LT       -> "LT"
+    | RBRACKET -> "RBRACKET"
+    | LBRACKET -> "LBRACKET"
+    | PIPE     -> "PIPE"
 
 let string_of_token_list tl =
     "[" ^ (String.concat "; " (List.map string_of_token tl)) ^ "]"

@@ -47,10 +47,44 @@ let parser_test_suite =
                 Clause (
                     TermExp (
                         "cat", [VarExp "X"]
-                    ), [
+                    ),
+                    [
                         TermExp ("true", [])
                     ]
                 )
+            );
+            "len([],0).", (
+              Clause (
+                TermExp (
+                  "len", [
+                    TermExp (
+                      "empty_list", []
+                    );
+                    IntExp 0
+                  ]
+                ),
+                [
+                  TermExp ("true", [])
+                ]
+              )
+            );
+            "l(H, T, [H|T]).", (
+              Clause (
+                TermExp (
+                  "l", [
+                    VarExp "H";
+                    VarExp "T";
+                    TermExp (
+                      "list", [
+                        VarExp "H";
+                        VarExp "T"
+                      ]
+                    )
+                  ]
+                ), [
+                  TermExp ("true", [])
+                ]
+              )
             );
             "coord(X, Y, Z).", (
                 Clause (
@@ -90,6 +124,75 @@ let parser_test_suite =
                         TermExp ("cat", [VarExp "X"])
                     ]
                 )
+            );
+            "len( [A, B | T], N) :- len(T, M), N is M + 2.", (
+              Clause (
+                TermExp (
+                  "len", [
+                    TermExp (
+                      "list", [
+                        VarExp "A";
+                        TermExp (
+                          "list", [
+                            VarExp "B";
+                            VarExp "T"
+                          ]
+                        )
+                      ]
+                    );
+                    VarExp "N"
+                  ]
+                ), [
+                  TermExp (
+                    "len", [
+                      VarExp "T";
+                      VarExp "M"
+                    ]
+                  );
+                  TermExp (
+                    "is", [
+                      VarExp "N";
+                      ArithmeticExp (
+                        PLUS,
+                        ArithmeticVar "M",
+                        ArithmeticInt 2
+                      )
+                    ]
+                  )
+                ]
+              )
+            );
+            "len([H|T], N) :- len(T, M), N is M + 1.", (
+              Clause (
+                TermExp (
+                  "len", [
+                    TermExp (
+                      "list", [
+                        VarExp "H";
+                        VarExp "T"
+                      ]
+                    );
+                    VarExp "N"
+                  ]
+                ), [
+                TermExp (
+                  "len", [
+                    VarExp "T";
+                    VarExp "M"
+                  ]
+                );
+                TermExp (
+                  "is", [
+                    VarExp "N";
+                    ArithmeticExp (
+                      PLUS,
+                      ArithmeticVar "M",
+                      ArithmeticInt 1
+                    )
+                  ]
+                )
+                ]
+              )
             );
             "sibling(X, Y) :- parent_child(Z, X), parent_child(Z, Y).", (
                 Clause (

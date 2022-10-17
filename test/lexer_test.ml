@@ -128,6 +128,15 @@ let lexer_test_suite =
               ATOM "lt"; LPAREN; VAR "X"; COMMA; VAR "Y"; RPAREN; RULE; VAR "X"; LT;
               VAR "Y"
             ];
+            "l(X, Y) :- [X | Y]", [
+              ATOM "l"; LPAREN; VAR "X"; COMMA; VAR "Y"; RPAREN; RULE; LBRACKET; VAR "X"; PIPE; VAR "Y"; RBRACKET
+            ];
+            "l([H | T], Y).", [
+              ATOM "l"; LPAREN; LBRACKET; VAR "H"; PIPE; VAR "T"; RBRACKET; COMMA; VAR "Y"; RPAREN; PERIOD
+            ];
+            "l([H1, H2 | T], Y).", [
+              ATOM "l"; LPAREN; LBRACKET; VAR "H1"; COMMA; VAR "H2"; PIPE; VAR "T"; RBRACKET; COMMA; VAR "Y"; RPAREN; PERIOD
+            ];
             "sibling(X, Y) :- parent_child(Z, X), parent_child(Z, Y).", [
                 ATOM "sibling";      LPAREN; VAR "X"; COMMA; VAR "Y"; RPAREN; RULE;
                 ATOM "parent_child"; LPAREN; VAR "Z"; COMMA; VAR "X"; RPAREN; COMMA;
