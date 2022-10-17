@@ -13,7 +13,6 @@ let try_parse s =
     try Some (parse s) with
     | Error -> None
 
-(* TODO - add arithmetic stuff in here, and remove stuff that's no longer relevant *)
 (* String conversion functions *)
 let string_of_token t =
     match t with
