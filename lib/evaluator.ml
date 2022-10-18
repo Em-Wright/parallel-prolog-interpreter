@@ -24,7 +24,7 @@ let (fresh, reset) =
    find_vars:
      * takes in:
          q - a list of exp
-     * returns a list of all VarExp (and ArithmeticVar) in the list
+     * returns a list of all VarExp (and ArithmeticVar as VarExp) in the list
 *)
 let rec find_vars q  =
     match q with
@@ -50,8 +50,6 @@ let rec find_vars q  =
   adapted from https://rosettacode.org/wiki/Remove_duplicate_elements#OCaml
 *)
 
-(* TODO - might be a better way of doing this. Definitely a better way if we're not fussy
-about the resulting order - Core.List.dedup_and_sort would work *)
 let uniq l =
     let rec tail_uniq a l =
         match l with
@@ -151,9 +149,6 @@ let rename_vars_in_dec d =
      * used for implementing decompose for unification
      * sargs and targs must be the same length, otherwise an exception is thrown
 *)
-
-(* TODO - rewrite this to use pattern matching to raise Failure, rather than
-using List.length *)
 let rec pairandcat sargs targs c =
     match sargs with
     | [] -> (
@@ -213,7 +208,6 @@ let rec occurs n t =
 *)
 
 (* John suggested considering the language guarantee that unifying a variable with anything is O(1) *)
-
 let rec unify constraints =
     match constraints with
     | [] -> Some []
@@ -233,9 +227,7 @@ let rec unify constraints =
                   our substitution (s,t) is valid, and so we add it to
                   the front of the resulting unifier list, with any
                   relevant substitutions applied *)
-                else let sub = [(s,t)] in
-                     let c'' = replace c' sub in
-                     let phi = unify c'' in (
+                else let phi = replace c' [(s,t)] |> unify in (
                         match phi with
                         | None -> None
                         | Some l -> Some ((s, sub_lift_goal l t) :: l)
@@ -247,11 +239,10 @@ let rec unify constraints =
                 (* Decompose *)
                 | TermExp (tname, targs) ->
                     if (tname = sname && List.length targs = List.length sargs)
-                    then unify (pairandcat sargs targs c')
+                    then pairandcat sargs targs c' |> unify
                     else None
                 | _ -> None
             )
-            (* Arithmetic expressions should not be substituted with anything else *)
             | _ -> ( (* Otherwise, we have s is an int or arithmetic expression, so we
                         can only unify it if t is a variable, and the unification needs
                         to be the other way round

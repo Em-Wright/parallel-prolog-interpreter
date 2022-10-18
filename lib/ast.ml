@@ -1,5 +1,3 @@
-(* TODO - introduce string constants back in as standalone expressions *)
-
 type arithmetic_operator = PLUS | MINUS | MULT | DIV
 
 type arithmetic_operand =
@@ -17,12 +15,6 @@ type exp =
 
 (* Declarations *)
 type dec =
-    | Clause of exp * (exp list)  (* Head :- Body. *) (* TODO - this type allows single integers to be the head
-                                                      of a rule or a whole query. This should really be limited
-                                                         to TermExps.
-                                                         For now, we'll leave this as an additional check, rather
-                                                         than as part of the type system. Potential to change this
-                                                         later, perhaps
-                                                      *)
+    | Clause of exp * (exp list)  (* Head :- Body. *)
     | Query of (exp list)         (* ?- Body.      *)
 
