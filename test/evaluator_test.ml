@@ -604,6 +604,7 @@ let evaluator_test_suite =
                 []
                 0
             ), "true\n";
+
             (string_of_res
                (eval_query
                   (
@@ -652,6 +653,7 @@ let evaluator_test_suite =
                [VarExp "Z"]
                1
             ), "====================\nZ = 1\n====================\ntrue\n";
+
             (string_of_res
                (eval_query
                   (
@@ -669,6 +671,7 @@ let evaluator_test_suite =
                [VarExp "Z"]
                1
             ), "====================\nZ = 10\n====================\ntrue\n";
+
             (string_of_res
                (eval_query
                   (
@@ -687,6 +690,7 @@ let evaluator_test_suite =
                [VarExp "Z"]
                1
             ), "====================\nZ = 5\n====================\ntrue\n";
+
             (string_of_res
                (eval_query
                   (
@@ -706,8 +710,42 @@ let evaluator_test_suite =
                )
                [VarExp "Z"]
                1
-            ), "====================\nZ = 7\n====================\n====================\nZ = 0\n====================\ntrue\n";
+            ), "====================\n\
+                Z = 7\n\
+                ====================\n\
+                ====================\n\
+                Z = 0\n\
+                ====================\n\
+                true\n";
 
+            (string_of_res
+               (eval_query
+                  (
+                    [TermExp("not_two", [VarExp "Z"])],
+                    [
+                      Clause (TermExp("nat", [IntExp (1)]), [TermExp("true", [])]);
+                      Clause (TermExp("nat", [IntExp (2)]), [TermExp("true", [])]);
+                      Clause (TermExp("nat", [IntExp (3)]), [TermExp("true", [])]);
+                      Clause (TermExp("nat", [IntExp (4)]), [TermExp("true", [])]);
+                      Clause (TermExp("not_two", [VarExp "X"]), [
+                          TermExp("nat", [VarExp "X"]);
+                          TermExp("not_equal", [ VarExp "X"; IntExp 2])
+                        ])
+                    ],
+                    []
+                  )
+               )
+               [VarExp "Z"]
+               1
+            ), "====================\n\
+                Z = 4\n\
+                ====================\n\
+                ====================\n\
+                Z = 3\n\
+                ====================\n\
+                ====================\n\
+                Z = 1\n\
+                ====================\ntrue\n";
 
             (string_of_res
                (eval_query
@@ -730,7 +768,13 @@ let evaluator_test_suite =
                )
                [VarExp "Z"]
                1
-            ), "====================\nZ = 3\n====================\n====================\nZ = -1\n====================\ntrue\n";
+            ), "====================\n\
+                Z = 3\n\
+                ====================\n\
+                ====================\n\
+                Z = -1\n\
+                ====================\n\
+                true\n";
 
             (string_of_res
                 (eval_query

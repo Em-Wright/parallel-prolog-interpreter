@@ -52,6 +52,7 @@
 %token DIV
 %token IS
 %token EQUALS
+%token NOTEQUAL
 %token GT
 %token LT
 
@@ -87,6 +88,7 @@ structure:
     | a = ATOM; LPAREN; tl = term_list; RPAREN          { TermExp (a, tl) }
     | v = VAR; IS; a = arithmetic                       { TermExp ("is", [VarExp v; a]) }
     | t1 = comparable; EQUALS; t2 = comparable          { TermExp ("equals", [t1; t2]) }
+    | t1 = comparable; NOTEQUAL; t2 = comparable          { TermExp ("not_equal", [t1; t2]) }
     | t1 = comparable; GT; t2 = comparable              { TermExp ("greater_than", [t1; t2]) }
     | t1 = comparable; LT; t2 = comparable              { TermExp ("less_than", [t1; t2]) }
 

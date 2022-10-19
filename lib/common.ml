@@ -32,6 +32,7 @@ let string_of_token t =
     | DIV      -> "DIV"
     | IS       -> "IS"
     | EQUALS   -> "EQUALS"
+    | NOTEQUAL -> "NOTEQUAL"
     | GT       -> "GT"
     | LT       -> "LT"
     | RBRACKET -> "RBRACKET"

@@ -82,6 +82,7 @@ rule token = parse
     | '/'               { DIV       }
     | " is "            { IS        }
     | '='               { EQUALS    }
+    | "!="              { NOTEQUAL  }
     | '>'               { GT        }
     | '<'               { LT        }
 

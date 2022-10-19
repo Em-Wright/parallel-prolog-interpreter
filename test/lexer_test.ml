@@ -65,6 +65,9 @@ let lexer_test_suite =
             "-",        [MINUS];
             "*",        [MULT];
             "/",        [DIV];
+            "=",        [EQUALS];
+            "!=",       [NOTEQUAL];
+            " is ",     [IS];
             ">",        [GT];
             "<",        [LT];
             ":- ?- ()", [RULE; QUERY; LPAREN; RPAREN];
@@ -119,6 +122,10 @@ let lexer_test_suite =
             "eq(X, Y) :- X = Y", [
               ATOM "eq"; LPAREN; VAR "X"; COMMA; VAR "Y"; RPAREN; RULE; VAR "X"; EQUALS;
                         VAR "Y"
+            ];
+            "neq(X, Y) :- X != Y", [
+              ATOM "neq"; LPAREN; VAR "X"; COMMA; VAR "Y"; RPAREN; RULE; VAR "X"; NOTEQUAL;
+              VAR "Y"
             ];
             "gt(X, Y) :- X > Y", [
               ATOM "gt"; LPAREN; VAR "X"; COMMA; VAR "Y"; RPAREN; RULE; VAR "X"; GT;

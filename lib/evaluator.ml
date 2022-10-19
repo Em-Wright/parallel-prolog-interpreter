@@ -294,7 +294,7 @@ let rec eval_query (q, db, env) =
         )
         (* if the goal is the 'equals' predicate *)
         | TermExp("equals", [lhs; rhs]) -> (
-            (* check if the lhs and rhs can unify p much *)
+            (* check if the lhs and rhs can unify *)
             match unify [(lhs, rhs)] with
             | Some s -> (
                 match unify (s@env) with
@@ -307,6 +307,19 @@ let rec eval_query (q, db, env) =
                 | None -> []
               )
             | None -> []
+          )
+        | TermExp("not_equal", [lhs;rhs]) -> (
+            (* check if the lhs and rhs can unify. If they can, this is not a
+               successful substitution. If they don't, we can continue solving the
+               rest of the goals
+            *)
+            match unify [(lhs, rhs)] with
+            | Some s -> (
+              match unify (s@env) with
+                | Some _ -> []
+                | None -> eval_query (gl, db, env)
+              )
+            | None -> eval_query (gl, db, env)
           )
         | TermExp("greater_than", [lhs; rhs]) -> (
           match lhs, rhs with
@@ -504,6 +517,8 @@ let add_dec_to_db (dec, db) =
           print_string "Can't reassign 'empty_list' predicate\n"; db
         | TermExp ("equals", _) ->
           print_string "Can't reassign 'equals' predicate\n"; db
+        | TermExp ("not_equal", _) ->
+          print_string "Can't reassign 'not_equal' predicate\n"; db
         | TermExp ("less_than", _) ->
           print_string "Can't reassign 'less_than' predicate\n"; db
         | TermExp ("greater_than", _) ->

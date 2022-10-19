@@ -261,6 +261,14 @@ let parser_test_suite =
                    IntExp 2
                  ])]
             );
+            "neq(X) :- X != 2.",
+            Clause (
+              TermExp ("neq", [VarExp "X"]),
+              [TermExp ("not_equal", [
+                   VarExp "X";
+                   IntExp 2
+                 ])]
+            );
             "gt(X) :- X > 2.",
             Clause (
               TermExp ("gt", [VarExp "X"]),
