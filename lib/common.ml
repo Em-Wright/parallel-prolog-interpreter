@@ -98,7 +98,6 @@ let string_of_unify_res s =
     | None   -> "None"
     | Some l -> string_of_subs l
 
-(* Convert ConstExp to a readable string *)
 let readable_string_of_arithmetic (op : arithmetic_operator) a1 a2 =
   let op_string =
     match op with
@@ -114,12 +113,29 @@ let readable_string_of_arithmetic (op : arithmetic_operator) a1 a2 =
   in
    (a_to_string a1) ^ op_string  ^ (a_to_string a2)
 
+
 (* Convert exp to a readable string *)
 let rec readable_string_of_exp e =
+  let readable_string_of_list list_exp =
+    let rec inner_string list_exp =
+      match list_exp with
+      | TermExp ("empty_list", []) -> ""
+      | TermExp ("list", [element; TermExp("empty_list", [])]) ->
+        readable_string_of_exp element
+      | TermExp ("list", [element; rest_of_list]) ->
+        let rest_of_string = inner_string rest_of_list in
+        (readable_string_of_exp element) ^ ", " ^ rest_of_string
+      | _ -> "This is not a list, but has been given to the readable_string_of_list function"
+    in
+    "[" ^ (inner_string list_exp) ^ "]"
+  in
     match e with
     | VarExp   v     -> v
     | IntExp   i     -> string_of_int i
-    | TermExp (s, l) ->
+    | TermExp (s, l) -> (
+      match s with
+      | "list" | "empty_list" -> readable_string_of_list e
+      | _ ->
         s ^ (
             if List.length l > 0
             then "(" ^ (
@@ -129,6 +145,7 @@ let rec readable_string_of_exp e =
             ) ^ ")"
             else ""
         )
+    )
     | ArithmeticExp (op, a1, a2) ->
       readable_string_of_arithmetic op a1 a2
 

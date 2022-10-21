@@ -461,6 +461,8 @@ let rec eval_query (q, db, env) =
        appearing in the original query of all solutions found and the
        word true if solution(s) were found and false otherwise
 *)
+
+
 let string_of_res e orig_query_vars orig_vars_num =
    (* iterate over e for each solution *)
    List.fold_left (
