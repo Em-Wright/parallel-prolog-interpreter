@@ -112,6 +112,7 @@ let parser_test_suite =
                     ]
                 )
             );
+
             (* Rules *)
             "cat :- true.", (
                 Clause (TermExp ("cat", []), [TermExp ("true", [])])
@@ -261,11 +262,11 @@ let parser_test_suite =
                    IntExp 2
                  ])]
             );
-            "neq(X) :- X != 2.",
+            "neq(X) :- 1 != 2.",
             Clause (
               TermExp ("neq", [VarExp "X"]),
               [TermExp ("not_equal", [
-                   VarExp "X";
+                   IntExp 1;
                    IntExp 2
                  ])]
             );
@@ -319,6 +320,19 @@ let parser_test_suite =
                        ]
                    )
                 ])
+            );
+            "?- len([2],1).", (
+              Query ([
+                TermExp (
+                  "len", [
+                    TermExp("list", [
+                        IntExp 2;
+                        TermExp("empty_list", [])
+                      ]);
+                    (IntExp 1);
+                  ]
+                )
+              ])
             );
 
             (* Combinations *)

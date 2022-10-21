@@ -408,9 +408,15 @@ let evaluator_test_suite =
 
             (string_of_unify_res
                 (unify
-                    ([( IntExp 10,  (IntExp 100))])
+                    ([( IntExp 10,  IntExp 100)])
                 )
             ), "None";
+
+            (string_of_unify_res
+               (unify
+                  ([( IntExp 10,  IntExp 10)])
+               )
+            ), "[]";
 
             (string_of_unify_res
                 (unify

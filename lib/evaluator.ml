@@ -207,7 +207,8 @@ let rec occurs n t =
        that unify the constraints
 *)
 
-(* John suggested considering the language guarantee that unifying a variable with anything is O(1) *)
+(* John suggested considering the language guarantee that unifying a variable with anything is O(1).
+We have an occurs check in here, however, so it's not O(1), I don't think *)
 let rec unify constraints =
     match constraints with
     | [] -> Some []
@@ -242,7 +243,7 @@ let rec unify constraints =
                     then pairandcat sargs targs c' |> unify
                     else None
                 | _ -> None
-            )
+              )
             | _ -> ( (* Otherwise, we have s is an int or arithmetic expression, so we
                         can only unify it if t is a variable, and the unification needs
                         to be the other way round
@@ -255,12 +256,12 @@ let rec unify constraints =
         )
 
 
-let perform_arithmetic (op : arithmetic_operator) i1 i2 : exp =
+let perform_arithmetic (op : arithmetic_operator) i1 i2 : int =
   match op with
-  | PLUS  -> IntExp (i1 + i2)
-  | MINUS -> IntExp (i1 - i2)
-  | MULT  -> IntExp (i1 * i2)
-  | DIV   -> IntExp (i1 / i2)
+  | PLUS  ->  (i1 + i2)
+  | MINUS -> (i1 - i2)
+  | MULT  -> (i1 * i2)
+  | DIV   -> (i1 / i2)
 
 (*
    eval_query:
@@ -315,7 +316,7 @@ let rec eval_query (q, db, env) =
             *)
             match unify [(lhs, rhs)] with
             | Some s -> (
-              match unify (s@env) with
+                match unify (s@env) with
                 | Some _ -> []
                 | None -> eval_query (gl, db, env)
               )
@@ -339,49 +340,49 @@ let rec eval_query (q, db, env) =
               []
           | _ -> [] (* arguments insufficiently instantiated *)
         )
-        (* if the goal is the 'is' predicate *)
         | TermExp("is", [lhs; rhs]) -> (
           (* evaluate the arithmetic expressions with current substitutions, then check if it is
              possible to unify them with any additional substitutions *)
-              match lhs with
-                | VarExp _ -> (
-                  match rhs with
-                  | ArithmeticExp (op, t1, t2) -> (
-                      match t1, t2 with
-                      | ArithmeticInt i1, ArithmeticInt i2 ->
-                        let result = perform_arithmetic op i1 i2 in
-                          (
-                            match unify [(lhs, result)] with
-                            | Some s -> ( match unify (s@env) with
-                                | Some env2 ->
-                                  eval_query (
-                                    sub_lift_goals s gl,
-                                    db,
-                                    env2
-                                  )
-                                | None -> []
-                              )
-                            | None -> []
-                          )
+            match rhs with
+            | ArithmeticExp (op, t1, t2) -> (
+                match t1, t2 with
+                  | ArithmeticInt i1, ArithmeticInt i2 -> (
+                      let result = perform_arithmetic op i1 i2 in
+                      match lhs with
+                      | VarExp _ ->
+                          ( match unify ((lhs, IntExp result)::env) with
+                              | Some env2 ->
+                                eval_query (
+                                  sub_lift_goals [(lhs, IntExp result)] gl,
+                                  db,
+                                  env2
+                                )
+                              | None -> []
+                            )
+                      | IntExp i ->
+                        if i = result then eval_query (gl, db, env) else []
                       | _ -> []
                     )
-                  | IntExp _ ->
-                    (
-                    match unify [(lhs, rhs)] with
-                    | Some s -> ( match unify (s@env) with
+                  | _ -> []
+              )
+            | IntExp result -> (
+                match lhs with
+                | VarExp _ ->
+                    ( match unify ((lhs, rhs)::env) with
                         | Some env2 ->
                           eval_query (
-                            sub_lift_goals s gl,
+                            sub_lift_goals [(lhs, rhs)] gl,
                             db,
                             env2
-                            )
+                          )
                         | None -> []
                       )
-                    | None -> []
+                | IntExp i -> (
+                    if i = result then eval_query (gl, db, env) else []
                   )
-                  | _ -> []
-                )
                 | _ -> []
+              )
+            | _ -> []
             )
         (* if goal is some other predicate *)
         | TermExp(_,_) -> (

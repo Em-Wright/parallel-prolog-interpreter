@@ -32,6 +32,7 @@ let main () =
         try (
           match In_channel.input_line fstream with
           | Some s -> (
+              print_endline s;
             let lexbuf = Lexing.from_string s in
             let newdb = handle_input db lexbuf in
             flush stdout;
