@@ -12,4 +12,3 @@ safe_queens([]).
 safe_queens([Q|Qs]) :- safe_queens(Qs, Q, 1), safe_queens(Qs).
 safe_queens([], Y, X).
 safe_queens([Q|Qs], Q0, D0) :- Q0 != Q, Diff is Q0 - Q, abs(Diff, AbsDiff), AbsDiff != D0, D1 is D0 + 1, safe_queens(Qs, Q0, D1).
-four_queens(R) :- perm([1,2,3,4], R), safe_queens(R).

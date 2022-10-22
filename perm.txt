@@ -1,4 +1,0 @@
-take([H|T], H, T).
-take([H|T], R, [H|S]) :- take(T, R, S).
-perm([], []).
-perm(L, [H|R]) :- take(L, H, T), perm(T,R).
