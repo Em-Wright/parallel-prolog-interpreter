@@ -1,5 +1,6 @@
 open Ast
 open Common
+open Core
 
 exception FAILED_SUBSTITUTION of string
 
@@ -45,17 +46,21 @@ let rec find_vars q  =
 (*
    uniq:
      * takes in:
-         l - a list
+         l - an exp list
      * returns the list reversed with only one copy of each element
   adapted from https://rosettacode.org/wiki/Remove_duplicate_elements#OCaml
 *)
 
-let uniq l =
+let uniq (l : exp list) =
     let rec tail_uniq a l =
         match l with
         | [] -> a
         | hd :: tl ->
-            tail_uniq (hd :: a) (List.filter (fun x -> (x <> hd) ) tl)
+            tail_uniq (hd :: a)
+              (List.filter
+                 ~f:(fun x -> not (Ast.equal_exp x hd))
+                 tl
+              )
     in
     tail_uniq [] l
 
@@ -67,18 +72,17 @@ let uniq l =
          a - an arithmetic sub-expression
      * returns the sub-expression with the substitutions applied
 *)
-let sub_lift_goal_arithmetic sub a =
+let sub_lift_goal_arithmetic (sub : (exp * exp) list) a =
   match a with
   | ArithmeticVar v -> (
       (* if this variable has a substitution do the substitution *)
-      try let i = List.assoc (VarExp v) sub in
-        match i with
-        | IntExp i2 -> ArithmeticInt i2
-        | VarExp v2 -> ArithmeticVar v2
+      match List.Assoc.find sub ~equal:(Ast.equal_exp) (VarExp v) with
+        | Some (IntExp i2) -> ArithmeticInt i2
+        | Some (VarExp v2) -> ArithmeticVar v2
+        | None -> a
         | _ -> raise (FAILED_SUBSTITUTION "Attempted to substitute an ArithmeticExp or a TermExp for a variable in\
                                           an arithmetic expression. If this has occurred, I've implemented\
                                           arithmetic wrong. Oops. ")
-      with Not_found -> a
     )
   | _ -> a
 
@@ -93,11 +97,12 @@ let rec sub_lift_goal sub g =
     match g with
     | VarExp v -> (
         (* if this variable has a substitution do the substitution *)
-        try let i = List.assoc g sub in i
-        with Not_found -> VarExp v
+        match List.Assoc.find sub ~equal:(Ast.equal_exp) g with
+        | Some i -> i
+        | None -> VarExp v
     )
     | TermExp (s, el) ->
-        TermExp (s, List.map (fun g1 -> sub_lift_goal sub g1) el)
+        TermExp (s, List.map ~f:(fun g1 -> sub_lift_goal sub g1) el)
     | ArithmeticExp (op, e1, e2) -> ArithmeticExp(op, sub_lift_goal_arithmetic sub e1, sub_lift_goal_arithmetic sub e2)
     | _  -> g
 
@@ -109,7 +114,7 @@ let rec sub_lift_goal sub g =
      * returns the list of goals with the substitutions applied to each goal
 *)
 let sub_lift_goals sub gl =
-    List.map (fun g1 -> sub_lift_goal sub g1) gl
+    List.map ~f:(fun g1 -> sub_lift_goal sub g1) gl
 
 (*
    rename_vars_in_dec:
@@ -123,9 +128,9 @@ let rename_vars_in_dec d =
         let head_vars = find_vars [h] in
         let body_vars = find_vars b in
         (* find uniq vars from both head and body *)
-        let vars = uniq (head_vars @ body_vars) in
+        let vars : exp list = uniq (head_vars @ body_vars) in
         (* get fresh variable mappings *)
-        let sub = List.map (fun x -> (x, VarExp (fresh()))) vars in
+        let sub = List.map ~f:(fun x -> (x, VarExp (fresh()))) vars in
         (* substitute new names for variables *)
         Clause (sub_lift_goal sub h, sub_lift_goals sub b)
     | Query (b) ->
@@ -133,7 +138,7 @@ let rename_vars_in_dec d =
         let body_vars = find_vars b in
         (* get fresh variable mappings *)
         let vars = uniq (body_vars) in
-        let sub = List.map (fun x -> (x, VarExp (fresh()))) vars in
+        let sub = List.map ~f:(fun x -> (x, VarExp (fresh()))) vars in
         (* substitute new names for variables *)
         Query (sub_lift_goals sub b)
 
@@ -183,16 +188,16 @@ let rec replace c sub =
          t - an exp
      * returns true if n matches any variable names in t and false otherwise
 *)
-let rec occurs n t =
+let rec occurs (n : string) t =
      match t with
-     | VarExp m -> n = m
+     | VarExp m -> String.equal n m
      | TermExp (_, el) ->
-        List.fold_left (fun acc v -> acc || (occurs n v)) false el
+        List.fold_left el ~f:(fun acc v -> (acc || (occurs n v))) ~init:false
      | ArithmeticExp (_, e1, e2) ->(
        match e1, e2 with
-       | ArithmeticVar v1, ArithmeticVar v2 -> n = v1 || n = v2
-       | ArithmeticVar v1, _ -> n = v1
-       | _, ArithmeticVar v2 -> n = v2
+       | ArithmeticVar v1, ArithmeticVar v2 -> String.equal n v1 || String.equal n v2
+       | ArithmeticVar v1, _ -> String.equal n v1
+       | _, ArithmeticVar v2 -> String.equal n v2
        | _ -> false
      )
      | _ -> false
@@ -213,7 +218,7 @@ let rec unify constraints =
     match constraints with
     | [] -> Some []
     | ((s, t) :: c') ->
-        if s = t
+        if Ast.equal_exp s t
         then unify c'  (* Delete *)
         else (
             match s with
@@ -239,7 +244,7 @@ let rec unify constraints =
                 | VarExp _ -> unify ((t, s) :: c')
                 (* Decompose *)
                 | TermExp (tname, targs) ->
-                    if (tname = sname && List.length targs = List.length sargs)
+                    if ((String.equal tname sname) && List.length targs = List.length sargs)
                     then pairandcat sargs targs c' |> unify
                     else None
                 | _ -> None
@@ -387,7 +392,7 @@ let rec eval_query (q, db, env) =
         (* if goal is some other predicate *)
         | TermExp(_,_) -> (
         (* iterate over the db *)
-        List.fold_right (
+        List.fold_right ~f:(
             fun rule r -> (
                 match (rename_vars_in_dec rule) with (* rename vars in rule to completely fresh ones *)
                 | Clause (h, b) -> (
@@ -443,7 +448,7 @@ let rec eval_query (q, db, env) =
                 )
                 (* found a dec in the db that isn't a Clause *)
                 |  _ -> r
-          )) db [] )
+          )) db ~init:[] )
         (* subgoal isn't a TermExp (i.e. is a VarExp or a ConstExp) *)
         | _ -> eval_query (gl, db, env)
     )
@@ -465,35 +470,34 @@ let rec eval_query (q, db, env) =
 
 let string_of_res e orig_query_vars orig_vars_num =
    (* iterate over e for each solution *)
-   List.fold_left (
+   List.fold_left e
+     ~f:(
         fun r2 env ->
         if orig_vars_num > 0
         then
           "====================\n" ^
             (* iterate over original query vars to find their substitution *)
-            (List.fold_left (
+            (List.fold_left
+               orig_query_vars
+               ~f:(
                  fun r d -> (
                    match d with
                    | VarExp v -> (
                      (* find variable substitution in the solution *)
-                     try let f = List.assoc (VarExp v) env in (
-                             match f with
-                             | VarExp _ ->
-                                (v ^ " is free\n") ^ r
-                             | _ ->
-                                (v ^ " = " ^ (
-                                   readable_string_of_exp f) ^ "\n") ^ r
-                           )
-                     with Not_found -> (v ^ " is free\n") ^ r)
+                       match List.Assoc.find env (VarExp v) ~equal:(Ast.equal_exp) with
+                       | Some (VarExp _) -> (v ^ " is free\n") ^ r
+                       | Some f -> (v ^ " = " ^ (readable_string_of_exp f) ^ "\n") ^ r
+                       | None -> (v ^ " is free\n") ^ r
+                     )
                    | _ -> r
                  )
-               ) "" (orig_query_vars) ) ^
+               ) ~init:"" ) ^
               "====================\n"  ^ r2
         else "" ^ r2
-     )  (if List.length e > 0 (* if e is empty then there were no solutions *)
+      )
+     ~init:(if List.length e > 0 (* if e is empty then there were no solutions *)
          then "true\n"
          else "false\n")
-                  e
 
 (*
    add_dec_to_db:

@@ -21,7 +21,7 @@
  (name sequential_interpreter)
  (synopsis "A sequential prolog interpreter")
  (description "A longer description")
- (depends ocaml dune core menhir ounit2)
+ (depends async ocaml dune core menhir ounit2 rpc_parallel)
  (tags
   ("prolog interpreter" prolog)))
 

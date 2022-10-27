@@ -10,11 +10,13 @@ homepage: "https://github.com/adamjstewart/prolog"
 doc: "https://url/to/documentation"
 bug-reports: "https://github.com/adamjstewart/prolog/issues"
 depends: [
+  "async"
   "ocaml"
   "dune" {>= "3.4"}
   "core"
   "menhir"
   "ounit2"
+  "rpc_parallel"
   "odoc" {with-doc}
 ]
 build: [
