@@ -533,7 +533,9 @@ let add_dec_to_db (dec, db) =
         | _ -> dec :: db
     )
     | Query _ -> (
-        dec :: db
+        dec :: db (* TODO - why are we adding a query to the database???
+                     surely we should just be returning the existing db?? 
+                  *)
     )
 
 (*

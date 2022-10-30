@@ -318,11 +318,6 @@ let evaluator_test_suite =
                )
             ), "None";
 
-            (* TODO - what should the unification behaviour be if we try to substitute an
-            ArithmeticExp for something else (e.g. a VarExp). The above case fails the
-            occurs check, so returns false, but what if it doesn't? I guess we probably should
-            be able to sub arithmetic in place of a variable? e.g. if X is Y + 1, then (X, Y+1)
-            is a valid substitution? Will go with this for now, but should clarify this later *)
             (string_of_unify_res
                (unify
                   ([( ArithmeticExp(PLUS, ArithmeticVar "Y", ArithmeticInt 2)), VarExp "X"])
