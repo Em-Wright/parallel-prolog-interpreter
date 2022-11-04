@@ -4,6 +4,7 @@ open Lexer_test
 open Parser_test
 open Evaluator_test
 open Stack_evaluator_test
+open Util_test
 
 
 let suite = "suite" >::: [

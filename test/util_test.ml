@@ -20,27 +20,27 @@ let util_test_suite =
               res arg
         )
     )
-      
+
       [
         (* Fresh variables *)
         (turn_to_unit (reset());
          turn_to_unit (fresh());
          fresh()
         ), "2";
-        
+
         (turn_to_unit (fresh());
          turn_to_unit (fresh());
          turn_to_unit (reset());
          fresh()
         ), "1";
-        
+
         (* Finding variables in declarations *)
         (string_of_exp_list
            (find_vars
               ([VarExp "X"; IntExp 10; TermExp("blah",[]); ArithmeticExp (PLUS, (ArithmeticVar "Y"), (ArithmeticInt 1))])
            )
         ), "[VarExp \"X\"; VarExp \"Y\"]";
-        
+
         (string_of_exp_list
            (find_vars
               ([VarExp "X"; IntExp 10; TermExp("blah",[VarExp "X"; VarExp "Y"])])
