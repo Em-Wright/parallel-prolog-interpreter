@@ -1,6 +1,8 @@
+open Core
 open Ast
 open Common
-open Core
+
+
 
 exception FAILED_SUBSTITUTION of string
 
@@ -268,190 +270,6 @@ let perform_arithmetic (op : arithmetic_operator) i1 i2 : int =
   | MULT  -> (i1 * i2)
   | DIV   -> (i1 / i2)
 
-(*
-   eval_query:
-     * takes in (all in a triple):
-         q - a list of exp
-         db - a list of dec
-         env - a list of substitutions
-               where each substitution is of type (exp * exp)
-     * returns a list of lists of substitutions where each
-       substitution is of type (exp * exp)
-         - if the returned list is empty then no solutions were found for the
-           query for the given db
-         - otherwise, each element is a list of substitutions for one solution
-           to the query with the given db
-*)
-let rec eval_query (q, db, env) =
-    match q with
-    | [] -> (
-        (* no more subgoals to prove so finished *)
-        [env]
-    )
-    | (g1 :: gl) -> (  (* have at least one more subgoal (g1) to prove *)
-        match g1 with
-        (* if goal is the true predicate *)
-        | TermExp("true", []) -> (
-          eval_query (
-              gl,
-              db,
-              env
-            )
-        )
-        (* if the goal is the 'equals' predicate *)
-        | TermExp("equals", [lhs; rhs]) -> (
-            (* check if the lhs and rhs can unify *)
-            match unify [(lhs, rhs)] with
-            | Some s -> (
-                match unify (s@env) with
-                | Some env2 ->
-                  (eval_query (
-                      sub_lift_goals s gl,
-                      db,
-                      env2
-                    ))
-                | None -> []
-              )
-            | None -> []
-          )
-        | TermExp("not_equal", [lhs;rhs]) -> (
-            (* check if the lhs and rhs can unify. If they can, this is not a
-               successful substitution. If they don't, we can continue solving the
-               rest of the goals
-            *)
-            match unify [(lhs, rhs)] with
-            | Some s -> (
-                match unify (s@env) with
-                | Some _ -> []
-                | None -> eval_query (gl, db, env)
-              )
-            | None -> eval_query (gl, db, env)
-          )
-        | TermExp("greater_than", [lhs; rhs]) -> (
-          match lhs, rhs with
-          | IntExp i1, IntExp i2 ->
-            if i1 > i2 then
-              eval_query (gl, db, env)
-            else
-              []
-          | _ -> [] (* arguments insufficiently instantiated *)
-        )
-        | TermExp("less_than", [lhs; rhs]) -> (
-          match lhs, rhs with
-          | IntExp i1, IntExp i2 ->
-            if i1 < i2 then
-              eval_query (gl, db, env)
-            else
-              []
-          | _ -> [] (* arguments insufficiently instantiated *)
-        )
-        | TermExp("is", [lhs; rhs]) -> (
-          (* evaluate the arithmetic expressions with current substitutions, then check if it is
-             possible to unify them with any additional substitutions *)
-            match rhs with
-            | ArithmeticExp (op, t1, t2) -> (
-                match t1, t2 with
-                  | ArithmeticInt i1, ArithmeticInt i2 -> (
-                      let result = perform_arithmetic op i1 i2 in
-                      match lhs with
-                      | VarExp _ ->
-                          ( match unify ((lhs, IntExp result)::env) with
-                              | Some env2 ->
-                                eval_query (
-                                  sub_lift_goals [(lhs, IntExp result)] gl,
-                                  db,
-                                  env2
-                                )
-                              | None -> []
-                            )
-                      | IntExp i ->
-                        if i = result then eval_query (gl, db, env) else []
-                      | _ -> []
-                    )
-                  | _ -> []
-              )
-            | IntExp result -> (
-                match lhs with
-                | VarExp _ ->
-                    ( match unify ((lhs, rhs)::env) with
-                        | Some env2 ->
-                          eval_query (
-                            sub_lift_goals [(lhs, rhs)] gl,
-                            db,
-                            env2
-                          )
-                        | None -> []
-                      )
-                | IntExp i -> (
-                    if i = result then eval_query (gl, db, env) else []
-                  )
-                | _ -> []
-              )
-            | _ -> []
-            )
-        (* if goal is some other predicate *)
-        | TermExp(_,_) -> (
-        (* iterate over the db *)
-        List.fold_right ~f:(
-            fun rule r -> (
-                match (rename_vars_in_dec rule) with (* rename vars in rule to completely fresh ones *)
-                | Clause (h, b) -> (
-                    (* check if this rule can be used for this subgoal *)
-                    match unify [(g1, h)] with
-                    (* s is a list of substitutions which allows g1 and h to unify *)
-                    | Some s -> (
-                        match unify (s@env) with
-                        (* env2 is the new set of substitutions which is compatible with the original env
-                        and with the new set of substitutions s *)
-                        | Some env2 -> (
-                            if (List.length b = 1)
-                            then (
-                                match b with
-                                (* if the rule proved the subgoal (ie. rule was a
-                                   fact) then recurse on remaining subgoals *)
-                                | ((TermExp ("true", _)) :: _) ->
-                                    ((eval_query (
-                                        sub_lift_goals s gl,
-                                        db,
-                                        env2
-                                     )) @ r)
-                                (* if rule wasn't a fact then we have more
-                                   subgoals from the body of the rule
-                                   to prove
-                                   sub_lift_goals takes our substitution list, and a list of goals,
-                                   and returns the goals with the substitution applied.
-                                *)
-                                | _ -> ((eval_query (
-                                    (sub_lift_goals s b) @ (sub_lift_goals s gl),
-                                    db,
-                                    env2
-                                )) @ r))
-                            else
-                                (* if rule wasn't a fact then we have more
-                                   subgoals from the body of the rule
-                                   to prove
-                                   we fold the result of evaluating the query with the other possible
-                                   solutions in r
-                                *)
-                                ((eval_query (
-                                    (sub_lift_goals s b) @ (sub_lift_goals s gl),
-                                    db,
-                                    env2
-                                )) @ r)
-                        )
-                        (* the substitution from unify the rule head and subgoal
-                           doesn't unify with the environment gathered so far *)
-                        | _ -> r
-                    )
-                    (* this rule's head doesn't unify with the subgoal *)
-                    | _ -> r
-                )
-                (* found a dec in the db that isn't a Clause *)
-                |  _ -> r
-          )) db ~init:[] )
-        (* subgoal isn't a TermExp (i.e. is a VarExp or a ConstExp) *)
-        | _ -> eval_query (gl, db, env)
-    )
 
 (*
    string_of_res:
@@ -466,8 +284,6 @@ let rec eval_query (q, db, env) =
        appearing in the original query of all solutions found and the
        word true if solution(s) were found and false otherwise
 *)
-
-
 let string_of_res e orig_query_vars orig_vars_num =
    (* iterate over e for each solution *)
    List.fold_left e
@@ -538,29 +354,29 @@ let add_dec_to_db (dec, db) =
                   *)
     )
 
-(*
-   eval_dec:
-     * takes in (all in a tuple):
-         dec - a dec type
-         db - a list of dec types
-     * evaluated the dec with the given db
-       returns the original db in the case
-       dec is a Query type
-       otherwise returns db prepended with dec
-*)
-let eval_dec (dec, db) =
-    match dec with
-    | Clause (_, _) -> add_dec_to_db (dec, db)
-    | Query b -> (
-        (* find all uniq VarExps in query *)
-        let orig_vars = uniq (find_vars b) in
-        (* find num of VarExps in query *)
-        let orig_vars_num = List.length orig_vars in
-        (* evaluate query *)
-        let res = eval_query (b, db, []) in
-        (* print the result *)
-        print_string (string_of_res (res) orig_vars orig_vars_num);
-        (* reset fresh variable counter *)
-        reset ();
-        db
-    )
+(* (\* *)
+(*    eval_dec: *)
+(*      * takes in (all in a tuple): *)
+(*          dec - a dec type *)
+(*          db - a list of dec types *)
+(*      * evaluated the dec with the given db *)
+(*        returns the original db in the case *)
+(*        dec is a Query type *)
+(*        otherwise returns db prepended with dec *)
+(* *\) *)
+(* let eval_dec (dec, db) = *)
+(*     match dec with *)
+(*     | Clause (_, _) -> add_dec_to_db (dec, db) *)
+(*     | Query b -> ( *)
+(*         (\* find all uniq VarExps in query *\) *)
+(*         let orig_vars = uniq (find_vars b) in *)
+(*         (\* find num of VarExps in query *\) *)
+(*         let orig_vars_num = List.length orig_vars in *)
+(*         (\* evaluate query *\) *)
+(*         let res = eval_query (b, db, []) in *)
+(*         (\* print the result *\) *)
+(*         print_string (string_of_res (res) orig_vars orig_vars_num); *)
+(*         (\* reset fresh variable counter *\) *)
+(*         reset (); *)
+(*         db *)
+(*     ) *)

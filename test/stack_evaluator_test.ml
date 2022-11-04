@@ -1,13 +1,14 @@
 open OUnit2
 open Sequential_interpreter.Ast
-open Sequential_interpreter.Evaluator
+open Sequential_interpreter.Util
+open Sequential_interpreter.Stack_evaluator
 
 
 let identity_func s = s
 let turn_to_unit _ = ()
 
 let stack_evaluator_test_suite =
-  "Evaluator" >::: (
+  "Stack Evaluator" >::: (
     List.map (
       fun (arg, res) ->
         let title =
@@ -36,7 +37,7 @@ let stack_evaluator_test_suite =
 
         (* TODO - reformat these so they're in the right format for the stack evaluator *)
         (string_of_res
-           (Sequential_interpreter.Stack_evaluator.eval_query
+           ( eval_query
                 []
                 []
            )
@@ -45,7 +46,7 @@ let stack_evaluator_test_suite =
         ), "true\n";
         
         (string_of_res
-           (Sequential_interpreter.Stack_evaluator.eval_query
+           ( eval_query
                 [TermExp ("true", [])]
                 []
            )
@@ -54,7 +55,7 @@ let stack_evaluator_test_suite =
         ), "true\n";
 
         (string_of_res
-           (Sequential_interpreter.Stack_evaluator.eval_query
+           ( eval_query
                 [TermExp ("male", [TermExp ("elizabeth", [])])]
                 []
            )
@@ -63,7 +64,7 @@ let stack_evaluator_test_suite =
         ), "false\n";
 
         (string_of_res
-           (Sequential_interpreter.Stack_evaluator.eval_query
+           ( eval_query
                         [TermExp ("parent", [VarExp "X"; TermExp ("charles1", [])])]
                         []
                 )
@@ -72,7 +73,7 @@ let stack_evaluator_test_suite =
         ), "false\n";
         
         (string_of_res
-           (Sequential_interpreter.Stack_evaluator.eval_query
+           ( eval_query
                         [TermExp ("male", [TermExp ("elizabeth", [])])]
                         [Clause (TermExp("female", [TermExp("elizabeth", [TermExp ("true", [])])]), [])]
                 )
@@ -81,7 +82,7 @@ let stack_evaluator_test_suite =
             ), "false\n";
 
             (string_of_res
-                (Sequential_interpreter.Stack_evaluator.eval_query
+                ( eval_query
                         [TermExp ("male", [TermExp ("elizabeth", [])])]
                         [Clause (TermExp("elizabeth", [TermExp("male", [])]), [TermExp ("true", [])])]
                 )
@@ -90,7 +91,7 @@ let stack_evaluator_test_suite =
             ), "false\n";
 
             (string_of_res
-                (Sequential_interpreter.Stack_evaluator.eval_query
+                ( eval_query
                         [TermExp ("female", [TermExp ("elizabeth", [])])]
                         [Clause (TermExp("female", [TermExp("elizabeth", [])]), [TermExp ("true", [])])]
                 )
@@ -99,7 +100,7 @@ let stack_evaluator_test_suite =
             ), "true\n";
 
             (string_of_res
-                (Sequential_interpreter.Stack_evaluator.eval_query
+                ( eval_query
                         [TermExp ("female", [TermExp ("elizabeth", [])])]
                         [Clause (TermExp("female", [TermExp("elizabeth", [])]), [TermExp("true", [])])]
                 )
@@ -108,7 +109,7 @@ let stack_evaluator_test_suite =
             ), "true\n";
 
             (string_of_res
-                (Sequential_interpreter.Stack_evaluator.eval_query
+                ( eval_query
                         [TermExp ("female", [TermExp ("elizabeth", [])])]
                         [Clause (TermExp("female", [TermExp("elizabeth", [])]), [TermExp("true", [])])]
                 )
@@ -117,7 +118,7 @@ let stack_evaluator_test_suite =
             ), "true\n";
 
             (string_of_res
-                (Sequential_interpreter.Stack_evaluator.eval_query
+                ( eval_query
                         [TermExp ("male", [TermExp ("elizabeth", [])])]
                         [Query([TermExp ("male", [TermExp ("elizabeth", [])])]);
                          Clause (TermExp("female", [TermExp("elizabeth", [])]), [TermExp("true", [])])]
@@ -127,7 +128,7 @@ let stack_evaluator_test_suite =
             ), "false\n";
 
             (string_of_res
-                (Sequential_interpreter.Stack_evaluator.eval_query
+                ( eval_query
                         [TermExp("age", [TermExp("zaid",[]); VarExp "Y"])]
                         []
                 )
@@ -136,7 +137,7 @@ let stack_evaluator_test_suite =
             ), "false\n";
 
             (string_of_res
-                (Sequential_interpreter.Stack_evaluator.eval_query
+                ( eval_query
                         [TermExp("age", [TermExp("zaid",[]); VarExp "Y"])]
                         [Clause (TermExp ("age", [ TermExp ("adam", []);
                               IntExp 10]), [TermExp ("true", [])])]
@@ -147,7 +148,7 @@ let stack_evaluator_test_suite =
 
 
             (string_of_res
-                (Sequential_interpreter.Stack_evaluator.eval_query
+                ( eval_query
                         [TermExp("age", [VarExp "E"; VarExp "Z"])]
                         [Clause (TermExp ("age", [TermExp ("adam", []);
                               IntExp 10]), [TermExp ("true", [])]);Clause (TermExp ("age", [TermExp ("zaid", []);  (IntExp 5)]), [TermExp ("true", [])])]
@@ -157,7 +158,7 @@ let stack_evaluator_test_suite =
             ), "====================\nE = zaid\nZ = 5\n====================\n====================\nE = adam\nZ = 10\n====================\ntrue\n";
 
             (string_of_res
-                (Sequential_interpreter.Stack_evaluator.eval_query
+                ( eval_query
                         [TermExp("age", [VarExp "X";  (IntExp 5)])]
                         [Clause (TermExp ("age", [TermExp ("adam", []);
                             IntExp 10]), [TermExp ("true", [])]);Clause (TermExp ("age", [TermExp ("zaid", []);  (IntExp 5)]), [TermExp ("true", [])])]
@@ -167,7 +168,7 @@ let stack_evaluator_test_suite =
             ), "====================\nX = zaid\n====================\ntrue\n";
 
             (string_of_res
-                (Sequential_interpreter.Stack_evaluator.eval_query
+                ( eval_query
                         [TermExp ("a", [])]
                         [Clause (TermExp ("a", []), [TermExp ("true", [])])]
                 )
@@ -176,7 +177,7 @@ let stack_evaluator_test_suite =
             ), "true\n";
 
             (string_of_res
-               (Sequential_interpreter.Stack_evaluator.eval_query
+               ( eval_query
                     [TermExp ("prepend", [
                          IntExp 1;
                          TermExp ("list", [
@@ -204,7 +205,7 @@ let stack_evaluator_test_suite =
                for the function perform_arithmetic, even though it's not too complex *)
 
             (string_of_res
-               (Sequential_interpreter.Stack_evaluator.eval_query
+               ( eval_query
                     [TermExp("nat1", [VarExp "Z"])]
                     [
                       Clause (TermExp("nat", [IntExp 0]), [TermExp("true", [])]);
@@ -219,7 +220,7 @@ let stack_evaluator_test_suite =
             ), "====================\nZ = 1\n====================\ntrue\n";
 
             (string_of_res
-               (Sequential_interpreter.Stack_evaluator.eval_query
+               ( eval_query
                     [TermExp("is_ten", [VarExp "Z"])]
                     [
                       Clause (TermExp("is_one", [IntExp 1]), [TermExp("true", [])]);
@@ -234,7 +235,7 @@ let stack_evaluator_test_suite =
             ), "====================\nZ = 10\n====================\ntrue\n";
 
             (string_of_res
-               (Sequential_interpreter.Stack_evaluator.eval_query
+               ( eval_query
                     [TermExp("is_five", [VarExp "Z"])]
                     [
                       Clause (TermExp("is_minus_ten", [IntExp (-10)]), [TermExp("true", [])]);
@@ -250,7 +251,7 @@ let stack_evaluator_test_suite =
             ), "====================\nZ = 5\n====================\ntrue\n";
 
             (string_of_res
-               (Sequential_interpreter.Stack_evaluator.eval_query
+               ( eval_query
                     [TermExp("nat", [VarExp "Z"])]
                     [
                       Clause (TermExp("nat", [VarExp "X"]), [
@@ -274,7 +275,7 @@ let stack_evaluator_test_suite =
                 true\n";
 
             (string_of_res
-               (Sequential_interpreter.Stack_evaluator.eval_query
+               ( eval_query
                     [TermExp("not_two", [VarExp "Z"])]
                     [
                       Clause (TermExp("nat", [IntExp (1)]), [TermExp("true", [])]);
@@ -300,7 +301,7 @@ let stack_evaluator_test_suite =
                 ====================\ntrue\n";
 
             (string_of_res
-               (Sequential_interpreter.Stack_evaluator.eval_query
+               ( eval_query
                     [TermExp("nat1", [VarExp "Z"])]
                     [
                       Clause (TermExp("nat", [IntExp (-2)]), [TermExp("true", [])]);
@@ -326,7 +327,7 @@ let stack_evaluator_test_suite =
                 true\n";
 
             (string_of_res
-                (Sequential_interpreter.Stack_evaluator.eval_query
+                ( eval_query
                         [TermExp("age", [VarExp "X"; VarExp "Y"]); TermExp("female", [VarExp "X"])]
                         [Clause (TermExp ("age", [ TermExp("adam", []); IntExp 10]), [TermExp ("true", [])]);Clause (TermExp ("age", [TermExp ("zaid", []);  (IntExp 5)]), [TermExp ("true", [])]); Clause (TermExp ("age", [TermExp ("ann", []);  (IntExp 12)]), [TermExp ("true", [])]); Clause (TermExp ("male", [TermExp ("zaid", [])]), [TermExp ("true", [])]); Clause (TermExp ("male", [ TermExp("adam", [])]), [TermExp ("true", [])]); Clause (TermExp ("female", [TermExp ("ann",[])]),[TermExp ("true", [])])]
                 )
@@ -335,7 +336,7 @@ let stack_evaluator_test_suite =
             ), "====================\nX = ann\nY = 12\n====================\ntrue\n";
 
             (string_of_res
-                (Sequential_interpreter.Stack_evaluator.eval_query
+                ( eval_query
                         [TermExp("sibling", [TermExp("sally",[]); TermExp("erica",[])])]
                         [Clause (TermExp ("parent_child", [VarExp "X"; VarExp "Y"]), [TermExp ("mother_child", [VarExp "X"; VarExp "Y"])]); Clause (TermExp ("parent_child", [VarExp "X"; VarExp "Y"]), [TermExp ("father_child", [VarExp "X"; VarExp "Y"])]); Clause (TermExp ("sibling", [VarExp "X"; VarExp "Y"]), [TermExp ("parent_child", [VarExp "Z"; VarExp "X"]); TermExp ("parent_child", [VarExp "Z"; VarExp "Y"])]); Clause (TermExp ("father_child", [TermExp ("mike", []); TermExp ("tom", [])]), [TermExp ("true", [])]); Clause (TermExp ("father_child", [TermExp ("tom", []); TermExp ("erica", [])]), [TermExp ("true", [])]); Clause (TermExp ("father_child", [TermExp ("tom", []); TermExp ("sally", [])]), [TermExp ("true", [])]); Clause (TermExp ("mother_child", [TermExp ("trude", []); TermExp ("sally", [])]), [TermExp ("true", [])])]
                 )
@@ -344,7 +345,7 @@ let stack_evaluator_test_suite =
             ), "true\n";
 
             (string_of_res
-                (Sequential_interpreter.Stack_evaluator.eval_query
+                ( eval_query
                         [TermExp("sibling", [VarExp "Z"; VarExp "E"])]
                         [Clause (TermExp ("parent_child", [VarExp "X"; VarExp "Y"]), [TermExp ("mother_child", [VarExp "X"; VarExp "Y"])]); Clause (TermExp ("parent_child", [VarExp "X"; VarExp "Y"]), [TermExp ("father_child", [VarExp "X"; VarExp "Y"])]); Clause (TermExp ("sibling", [VarExp "X"; VarExp "Y"]), [TermExp ("parent_child", [VarExp "Z"; VarExp "X"]); TermExp ("parent_child", [VarExp "Z"; VarExp "Y"])]); Clause (TermExp ("father_child", [TermExp ("mike", []); TermExp ("tom", [])]), [TermExp ("true", [])]); Clause (TermExp ("father_child", [TermExp ("tom", []); TermExp ("erica", [])]), [TermExp ("true", [])]); Clause (TermExp ("father_child", [TermExp ("tom", []); TermExp ("sally", [])]), [TermExp ("true", [])]); Clause (TermExp ("mother_child", [TermExp ("trude", []); TermExp ("sally", [])]), [TermExp ("true", [])])]
                 )
@@ -353,7 +354,7 @@ let stack_evaluator_test_suite =
             ), "====================\nZ = sally\nE = sally\n====================\n====================\nZ = sally\nE = erica\n====================\n====================\nZ = erica\nE = sally\n====================\n====================\nZ = erica\nE = erica\n====================\n====================\nZ = tom\nE = tom\n====================\n====================\nZ = sally\nE = sally\n====================\ntrue\n";
 
             (string_of_res
-                (Sequential_interpreter.Stack_evaluator.eval_query
+                ( eval_query
                         [TermExp("animal", [VarExp "X"; VarExp "Y"])]
                         [Clause (TermExp ("animal", [VarExp "X"; VarExp "Y"]), [TermExp ("cat", [VarExp "X"])]); Clause (TermExp ("cat", [TermExp ("tom", [])]), [TermExp ("true", [])])]
                 )
@@ -362,7 +363,7 @@ let stack_evaluator_test_suite =
             ), "====================\nX = tom\nY is free\n====================\ntrue\n";
 
             (string_of_res
-                (Sequential_interpreter.Stack_evaluator.eval_query
+                ( eval_query
                         [TermExp("animal", [VarExp "X"; VarExp "Y"]); VarExp "Z"]
                         [Clause (TermExp ("animal", [VarExp "X"; VarExp "Y"]), [TermExp ("cat", [VarExp "X"])]); Clause (TermExp ("cat", [TermExp ("tom", [])]), [TermExp ("true", [])])]
                 )
@@ -371,7 +372,7 @@ let stack_evaluator_test_suite =
             ), "====================\nX = tom\nY is free\nZ is free\n====================\ntrue\n";
 
             (string_of_res
-                (Sequential_interpreter.Stack_evaluator.eval_query
+                ( eval_query
                         [VarExp "X"]
                         [Clause (TermExp ("animal", [VarExp "X"; VarExp "Y"]), [TermExp ("cat", [VarExp "X"])]); Clause (TermExp ("cat", [TermExp ("tom", [])]), [TermExp ("true", [])])]
                 )
@@ -380,7 +381,7 @@ let stack_evaluator_test_suite =
             ), "====================\nX is free\n====================\ntrue\n";
 
             (string_of_res
-                (Sequential_interpreter.Stack_evaluator.eval_query
+                ( eval_query
                         [TermExp("animal", [VarExp "X"; VarExp "Y"]); VarExp "Z"]
                         [Clause (TermExp ("animal", [VarExp "X"; VarExp "Y"]), [TermExp ("cat", [VarExp "X"])]); Clause (TermExp ("cat", [TermExp ("tom", [])]), [TermExp ("true", [])])]
                 )
@@ -389,7 +390,7 @@ let stack_evaluator_test_suite =
             ), "====================\nX = tom\nY is free\nZ is free\n====================\ntrue\n";
 
             (string_of_res
-                (Sequential_interpreter.Stack_evaluator.eval_query
+                ( eval_query
                         [TermExp("animal", [VarExp "X"; VarExp "Y"]); VarExp "Z"]
                         [Clause (TermExp ("animal", [VarExp "X"; VarExp "Y"]), [TermExp ("cat", [VarExp "X"])]); Clause (TermExp ("cat", [TermExp ("tom", [])]), [TermExp ("true", [])])]
                 )
@@ -398,7 +399,7 @@ let stack_evaluator_test_suite =
             ), "false\n";
 
             (string_of_res
-                (Sequential_interpreter.Stack_evaluator.eval_query
+                ( eval_query
                         [TermExp("b", [TermExp("a", [TermExp("true",[])])])]
                         [Clause (TermExp("b",[VarExp "X"]), [TermExp("a", [VarExp "X"])]); Clause (TermExp("a",[TermExp("true",[])]), [TermExp ("true", [])])]
                 )
