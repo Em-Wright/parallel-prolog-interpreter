@@ -1,6 +1,5 @@
 open Ast
 open Core
-open Async
 open Util
 
 
@@ -190,16 +189,17 @@ let rec eval_query (q, db, env) =
     )
 
 
-let command : Async.Command.t =
-  Async.Command.async
+let command =
+  Command.basic
     ~summary:"Sequential Prolog interpreter"
     [%map_open.Command
-       (* TODO - figure out how to make the filename optional *)
        let filename =
          flag
            ~doc:"FILE optional file to read prolog from"
            "file"
            (optional string)
        in
-       fun () -> Interface.main filename ~eval_function:(fun db b -> eval_query (b, db, []) |> return )
+       fun () ->
+         print_endline "does this work";
+         Interface.main filename ~eval_function:(fun db b -> eval_query (b, db, []) )
     ]

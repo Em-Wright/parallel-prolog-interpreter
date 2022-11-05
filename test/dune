@@ -1,4 +1,4 @@
 (test
  (name all_tests)
-(libraries ounit2 sequential_interpreter)
+(libraries ounit2 prolog_interpreter)
 )

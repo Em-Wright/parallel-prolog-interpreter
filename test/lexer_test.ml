@@ -1,7 +1,7 @@
 open OUnit2
-open Sequential_interpreter.Common
-open Sequential_interpreter.Lexer
-open Sequential_interpreter.Parser
+open Prolog_interpreter.Common
+open Prolog_interpreter.Lexer
+open Prolog_interpreter.Parser
 
 
 let lexer_test_suite =

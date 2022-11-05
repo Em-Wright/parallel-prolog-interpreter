@@ -1,6 +1,6 @@
 open OUnit2
-open Sequential_interpreter.Ast
-open Sequential_interpreter.Common
+open Prolog_interpreter.Ast
+open Prolog_interpreter.Common
 
 
 let parser_test_suite =

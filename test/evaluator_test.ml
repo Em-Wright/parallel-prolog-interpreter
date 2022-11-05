@@ -1,7 +1,7 @@
 open OUnit2
-open Sequential_interpreter.Ast
-open Sequential_interpreter.Util
-open Sequential_interpreter.Evaluator
+open Prolog_interpreter.Ast
+open Prolog_interpreter.Util
+open Prolog_interpreter.Evaluator
 
 
 let identity_func s = s
@@ -539,7 +539,7 @@ let evaluator_test_suite =
             (* ), "[Clause (TermExp (\"parent\", [TermExp (\"george1\", []); TermExp (\"sophia\", [])]), [TermExp (\"true\", [])]); Clause (TermExp (\"parent\", [TermExp (\"sophia\", []); TermExp (\"elizabeth\", [])]), [TermExp (\"true\", [])]); Clause (TermExp (\"parent\", [TermExp (\"james2\", []); TermExp (\"charles1\", [])]), [TermExp (\"true\", [])]); Clause (TermExp (\"parent\", [TermExp (\"catherine\", []); TermExp (\"charles1\", [])]), [TermExp (\"true\", [])]); Clause (TermExp (\"parent\", [TermExp (\"charles2\", []); TermExp (\"charles1\", [])]), [TermExp (\"true\", [])]); Clause (TermExp (\"parent\", [TermExp (\"elizabeth\", []); TermExp (\"james1\", [])]), [TermExp (\"true\", [])]); Clause (TermExp (\"parent\", [TermExp (\"charles1\", []); TermExp (\"james1\", [])]), [TermExp (\"true\", [])]); Clause (TermExp (\"female\", [TermExp (\"sophia\", [])]), [TermExp (\"true\", [])]); Clause (TermExp (\"female\", [TermExp (\"elizabeth\", [])]), [TermExp (\"true\", [])]); Clause (TermExp (\"female\", [TermExp (\"catherine\", [])]), [TermExp (\"true\", [])]); Clause (TermExp (\"male\", [TermExp (\"george1\", [])]), [TermExp (\"true\", [])]); Clause (TermExp (\"male\", [TermExp (\"james2\", [])]), [TermExp (\"true\", [])]); Clause (TermExp (\"male\", [TermExp (\"charles2\", [])]), [TermExp (\"true\", [])]); Clause (TermExp (\"male\", [TermExp (\"charles1\", [])]), [TermExp (\"true\", [])]); Clause (TermExp (\"male\", [TermExp (\"james1\", [])]), [TermExp (\"true\", [])]); Clause (TermExp (\"true\", []), [TermExp (\"true\", [])])]"; *)
 
             (* (string_of_db *)
-            (*     (Sequential_interpreter.Interface.eval_dec *)
+            (*     (Prolog_interpreter.Interface.eval_dec *)
             (*         ~dec:( *)
             (*             Query ([TermExp ("parent", [VarExp "X"; TermExp ("charles1", [])]); TermExp ("female", [VarExp "X"])]) ) *)
             (*          ~db:(   [Clause (TermExp ("parent", [TermExp ("george1", []); TermExp ("sophia", [])]), [TermExp ("true", [])]); Clause (TermExp ("parent", [TermExp ("sophia", []); TermExp ("elizabeth", [])]), [TermExp ("true", [])]); Clause (TermExp ("parent", [TermExp ("james2", []); TermExp ("charles1", [])]), [TermExp ("true", [])]); Clause (TermExp ("parent", [TermExp ("catherine", []); TermExp ("charles1", [])]), [TermExp ("true", [])]); Clause (TermExp ("parent", [TermExp ("charles2", []); TermExp ("charles1", [])]), [TermExp ("true", [])]); Clause (TermExp ("parent", [TermExp ("elizabeth", []); TermExp ("james1", [])]), [TermExp ("true", [])]); Clause (TermExp ("parent", [TermExp ("charles1", []); TermExp ("james1", [])]), [TermExp ("true", [])]); Clause (TermExp ("female", [TermExp ("sophia", [])]), [TermExp ("true", [])]); Clause (TermExp ("female", [TermExp ("elizabeth", [])]), [TermExp ("true", [])]); Clause (TermExp ("female", [TermExp ("catherine", [])]), [TermExp ("true", [])]); Clause (TermExp ("male", [TermExp ("george1", [])]), [TermExp ("true", [])]); Clause (TermExp ("male", [TermExp ("james2", [])]), [TermExp ("true", [])]); Clause (TermExp ("male", [TermExp ("charles2", [])]), [TermExp ("true", [])]); Clause (TermExp ("male", [TermExp ("charles1", [])]), [TermExp ("true", [])]); Clause (TermExp ("male", [TermExp ("james1", [])]), [TermExp ("true", [])])] *)

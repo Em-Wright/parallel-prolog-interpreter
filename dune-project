@@ -1,6 +1,6 @@
 (lang dune 3.4)
 
-(name sequential_interpreter)
+(name prolog_interpreter)
 
  (using menhir 2.1)
 
@@ -18,11 +18,11 @@
 (documentation https://url/to/documentation)
 
 (package
- (name sequential_interpreter)
- (synopsis "A sequential prolog interpreter")
+ (name prolog_interpreter)
+ (synopsis "A prolog interpreter in OCaml")
  (description "A longer description")
  (depends async ocaml dune core menhir ounit2 rpc_parallel)
  (tags
-  ("prolog interpreter" prolog)))
+  ("prolog interpreter" prolog ocaml)))
 
 ; See the complete stanza docs at https://dune.readthedocs.io/en/stable/dune-files.html#dune-project

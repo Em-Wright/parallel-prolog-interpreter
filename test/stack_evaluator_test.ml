@@ -1,7 +1,7 @@
 open OUnit2
-open Sequential_interpreter.Ast
-open Sequential_interpreter.Util
-open Sequential_interpreter.Stack_evaluator
+open Prolog_interpreter.Ast
+open Prolog_interpreter.Util
+open Prolog_interpreter.Stack_evaluator
 
 
 let identity_func s = s

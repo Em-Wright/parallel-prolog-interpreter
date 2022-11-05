@@ -1,5 +1,4 @@
 open Core
-open Async
 open Ast
 open Util
 
@@ -154,8 +153,8 @@ let eval_query b db =
   Deque.enqueue_front q (b, []);
   eval_inner q db []
 
-let command : Async.Command.t =
-  Async.Command.async
+let command =
+  Command.basic
     ~summary:"Stack-sequential Prolog interpreter"
     [%map_open.Command
       let filename =
@@ -164,5 +163,5 @@ let command : Async.Command.t =
           "file"
           (optional string)
       in
-      fun () -> Interface.main filename ~eval_function:(fun db b -> eval_query b db |> return )
+      fun () -> Interface.main filename ~eval_function:(fun db b -> eval_query b db )
     ]

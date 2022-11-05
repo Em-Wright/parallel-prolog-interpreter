@@ -1,7 +1,7 @@
 open OUnit2
-open Sequential_interpreter.Ast
-open Sequential_interpreter.Common
-open Sequential_interpreter.Util
+open Prolog_interpreter.Ast
+open Prolog_interpreter.Common
+open Prolog_interpreter.Util
 
 let identity_func s = s
 let turn_to_unit _ = ()

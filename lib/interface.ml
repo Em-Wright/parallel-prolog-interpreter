@@ -1,30 +1,29 @@
 open Core
 open Ast
-open Async
 open Parser
 open Util
 
 
-let eval_dec ~db ~dec ~eval_function : dec list Deferred.t = (
+let eval_dec ~db ~dec ~eval_function : dec list = (
   match dec with
-  | Clause (_, _) -> add_dec_to_db (dec, db) |> return
+  | Clause (_, _) -> add_dec_to_db (dec, db)
   | Query b -> (
       (* find all uniq VarExps in query *)
       let orig_vars = uniq (find_vars b) in
       (* find num of VarExps in query *)
       let orig_vars_num = List.length orig_vars in
       (* evaluate query *)
-      let%bind res = eval_function db b in
+      let res = eval_function db b in
       (* print the result *)
       print_string (string_of_res (res) orig_vars orig_vars_num);
       (* reset fresh variable counter *)
       reset ();
-      return db
+      db
     )
 )
-        ;;
+;;
 
-let handle_input db lexbuf ~eval_function : dec list Deferred.t = (
+let handle_input db lexbuf ~eval_function : dec list = (
   let dec = clause (
       fun lb -> (
           match Lexer.token lb with
@@ -40,9 +39,9 @@ let handle_input db lexbuf ~eval_function : dec list Deferred.t = (
 let main filename_opt ~eval_function =
    (
     print_endline "\nWelcome to the Prolog Interpreter\n";
-    let%bind initial_db = (
+    let initial_db = (
       match filename_opt with
-      | None -> return []
+      | None -> []
       | Some filename -> (
           let rec loop db file_lines =
             (
@@ -51,7 +50,7 @@ let main filename_opt ~eval_function =
                   try (
                     print_endline s;
                     let lexbuf = Lexing.from_string s in
-                    let%bind newdb = handle_input db lexbuf ~eval_function in
+                    let newdb = handle_input db lexbuf ~eval_function in
                     loop newdb ss
                   ) with
                   | Failure f -> ( (* in case of an error *)
@@ -68,21 +67,22 @@ let main filename_opt ~eval_function =
                       loop db ss
                     )
                 )
-              | [] -> return db
+              | [] -> db
             )
           in
           print_endline ("Opening file " ^ filename ^ "\n");
           let file_lines = In_channel.read_lines filename in
-          let%bind db = loop [] file_lines in
+          let db = loop [] file_lines in
           print_endline "\n\nFile contents loaded.\n\n";
-          return db
+          db
         ))
     in
     let rec loop db = (
       try (
         let lexbuf = Lexing.from_channel In_channel.stdin in
         print_string "> ";
-        let%bind newdb = handle_input db lexbuf ~eval_function in
+        Out_channel.flush stdout;
+        let newdb = handle_input db lexbuf ~eval_function in
         loop newdb
       ) with
       | Failure s -> ( (* in case of an error *)

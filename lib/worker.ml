@@ -250,11 +250,18 @@ let command : Async.Command.t =
   Async.Command.async
     ~summary:"Parallel Prolog interpreter"
     [%map_open.Command
-      let filename =
+      let _filename =
         flag
           ~doc:"FILE optional file to read prolog from"
           "file"
           (optional string)
       in
-      fun () -> Interface.main filename ~eval_function:(fun db b -> run b db )
+      fun () -> return ()
+        (* Interface.main filename ~eval_function:(fun db b -> run b db ) *)
     ]
+
+(* let () =  *)
+(* let backend_and_settings = Rpc_parallel.Backend_and_settings.T ((module Backend), ()) in *)
+(* Rpc_parallel.start_app *)
+(*   backend_and_settings *)
+(*   Prolog_interpreter.Main.command *)

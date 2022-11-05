@@ -1,7 +1,7 @@
 (menhir (modules parser))
 (ocamllex lexer)
 (library
- (name sequential_interpreter)
+ (name prolog_interpreter)
  (modules (:standard parser) main)
  (libraries core ounit2 menhirLib rpc_parallel async )
  (preprocess (pps ppx_jane))
