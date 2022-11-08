@@ -33,7 +33,7 @@ let handle_input db lexbuf ~eval_function : dec list = (
 	  ) lexbuf
   in
   eval_dec ~db ~dec ~eval_function
-    )
+ )
 ;;
 
 let main filename_opt ~eval_function =

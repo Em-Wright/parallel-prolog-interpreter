@@ -1,0 +1,5 @@
+(library
+ (name worker)
+ (libraries core rpc_parallel async )
+ (preprocess (pps ppx_jane ppx_inline_test))
+)

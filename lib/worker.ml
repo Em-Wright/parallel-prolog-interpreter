@@ -1,49 +1,40 @@
 open Core
 open Async
-open! Rpc_parallel
 open Ast
+open Parser
 open Util
 
 module Results = struct
   type t = (exp * exp) list list [@@deriving bin_io]
 end
 
-module Worker = struct
-  module T = struct
-    (* TODO - the init_arg needs to give the rules (with any subsitutions needed to
-       be able to treat the problem as isolated already done), the query to be
-       solved, potentially the `location' of the node it's starting the search from,
-       for later aggregation of solutions.
+module T = struct
+  type 'worker functions = {eval_query : ('worker, unit, Results.t) Rpc_parallel_edit.Function.t}
 
-       Worker_state.t itself will need to hold all of this information, plus a stack
-       of work to be done (from which work to be given to others can be drawn), plus
-       any solutions generated so far.
-    *)
+  module Worker_state = struct
+    type init_arg = {
+      b : exp list;
+      db : dec list
+    }
+    [@@deriving bin_io]
 
-    module Worker_state = struct
-      type init_arg = {
-        b : exp list;
-        db : dec list
-      }
-      [@@deriving bin_io]
+    (* TODO - make these mutable, so we can update results etc as we go - don't need
+       to be making multiple copies in the eval_inner function *)
+    (* TODO - could add a `done' field here, if we end up having to have a polling
+       process for giving the worker work. We could then have the main process periodically
+       check for results (and take any if there are, resetting results to []), and
+       check if the processing has finished yet. And if so, give it more work. *)
+    type t = {
+      q : (exp list * (exp * exp ) list) Deque.t;
+      db : dec list;
+      results : (exp * exp) list list
+    }
+  end
 
-      (* TODO - make these mutable, so we can update results etc as we go - don't need
-      to be making multiple copies in the eval_inner function *)
-      (* TODO - could add a `done' field here, if we end up having to have a polling
-      process for giving the worker work. We could then have the main process periodically
-      check for results (and take any if there are, resetting results to []), and
-      check if the processing has finished yet. And if so, give it more work. *)
-      type t = {
-        q : (exp list * (exp * exp ) list) Deque.t;
-        db : dec list;
-        results : (exp * exp) list list
-      }
-    end
-
-    module Connection_state = struct
-      type init_arg = unit [@@deriving bin_io]
-      type t = unit
-    end
+  module Connection_state = struct
+    type init_arg = unit [@@deriving bin_io]
+    type t = unit
+  end
 
     (* TODO - would it make sense to have the recursive part as an inner function,
        then we don't need to pass the db every time? *)
@@ -178,90 +169,127 @@ module Worker = struct
       Deque.enqueue_front q (init_arg.b, []);
       {q; db = init_arg.db; results = []}
 
-    (* TODO - will need to add functions for updating the worker with new work when
-       it runs out. This will be pretty much the same as the spawn function in terms of
-       the information it needs to be passed. For now, we're having a sequential interpreter
-       in one worker, so we don't need to implement this function immediately.
-    *)
-    (* TODO - need the worker to be able to inform the main process when it's finished
-       working. Not sure if this is gonna have to be a system of polling, where the main
-       process periodically checks if the work is done, or if the worker can interrupt
-       the main process.
-    *)
-    type 'worker functions = {eval_query : ('worker, unit, Results.t) Rpc_parallel.Function.t}
 
-    module Functions
-        (C : Rpc_parallel.Creator
-         with type worker_state := Worker_state.t
-          and type connection_state := Connection_state.t) =
-    struct
-      let eval_query_impl ~worker_state ~conn_state:() _ =
-        eval_inner worker_state
-      ;;
+  module Functions
+      (C : Rpc_parallel_edit.Creator
+       with type worker_state := Worker_state.t
+        and type connection_state := Connection_state.t) =
+  struct
+    let eval_query_impl ~worker_state ~conn_state:() _ =
+      eval_inner worker_state
+    ;;
 
-      let eval_query =
-        C.create_rpc
-          ~f:eval_query_impl
-          ~bin_input:(Unit.bin_t)
-          ~bin_output:(Results.bin_t)
-          ()
+    let eval_query =
+      C.create_rpc
+        ~f:eval_query_impl
+        ~bin_input:(Unit.bin_t)
+        ~bin_output:(Results.bin_t)
+        ()
 
-      let functions = {eval_query}
-      let init_worker_state init_arg = initialise init_arg |> return
-      let init_connection_state ~connection:_ ~worker_state:_ = return
-    end
+    let functions = {eval_query}
+    let init_worker_state init_arg = initialise init_arg |> return
+    let init_connection_state ~connection:_ ~worker_state:_ = return
 
   end
-
-  include Rpc_parallel.Make (T)
 end
 
-type t = Worker.Connection.t
+include Rpc_parallel_edit.Make (T)
 
-(* let spawn b db = *)
-(*   let%map worker = *)
-(*   Worker.spawn_exn *)
-(*     ~redirect_stdout:`Dev_null (\* TODO - switch this to `File_append or `File_truncate at some point*\) *)
-(*     ~redirect_stderr:`Dev_null *)
-(*     ~on_failure:Error.raise *)
-(*     ~shutdown_on:Heartbeater_connection_timeout *)
-(*     {b; db} *)
-(*   in *)
-(*   worker *)
-
-
-(* let eval_query t = *)
-(*   let%bind conn = Worker.Connection.client_exn t () in *)
-(*   Worker.Connection.run_exn conn  ~f:(Worker.functions.eval_query) ~arg:() *)
-
+(* TODO - at some point, will need to reformulate this so that we start the
+workers to begin with, rather than only when we get a query. At the moment,
+we'll be starting a new worker to deal with each query. *)
 let run b db =
-  let%bind worker =
-    Worker.spawn_exn
-      ~redirect_stdout:`Dev_null (* TODO - switch this to `File_append or `File_truncate at some point*)
-      ~redirect_stderr:`Dev_null
+  let%bind worker : t Deferred.t =
+    spawn_exn
       ~on_failure:Error.raise
       ~shutdown_on:Heartbeater_connection_timeout
+      ~redirect_stdout:(`File_append "/Users/em/Documents/diss_stdout.log")
+      ~redirect_stderr:(`File_append "/Users/em/Documents/diss_stderr.log")
       {b; db}
   in
-  let%bind conn = Worker.Connection.client_exn worker () in
-  Worker.Connection.run_exn conn ~f:(Worker.functions.eval_query) ~arg:()
+  let%bind conn = Connection.client_exn worker () in
+  Connection.run_exn conn ~f:(functions.eval_query) ~arg:()
 
-let command : Async.Command.t =
-  Async.Command.async
+
+
+let main filename =
+   (
+    print_endline "\nWelcome to the Prolog Interpreter\n";
+    let%bind () = (
+          let rec loop db file_lines =
+            (
+              match file_lines with
+              | s::ss -> (
+                  try (
+                    let lexbuf = Lexing.from_string s in
+                    let dec = clause (
+                        fun lb -> (
+                            match Lexer.token lb with
+                            | EOF -> raise Lexer.EndInput
+		                        | r -> r
+		                      )
+	                    ) lexbuf
+                    in
+                    let%bind newdb = (
+                    match dec with
+                    | Clause (_, _) -> add_dec_to_db (dec, db) |> return
+                    | Query b -> (
+                        print_endline s;
+                        (* find all uniq VarExps in query *)
+                        let orig_vars = uniq (find_vars b) in
+                        (* find num of VarExps in query *)
+                        let orig_vars_num = List.length orig_vars in
+                        (* evaluate query *)
+                        let%bind res = run b db in
+                        (* print the result *)
+                        print_string "\n";
+                        print_endline (string_of_res (res) orig_vars orig_vars_num);
+                        print_string "\n\n";
+                        (* reset fresh variable counter *)
+                        reset ();
+                        return db
+                      )
+                  ) in
+                    loop newdb ss
+                  ) with
+                  | Failure f -> ( (* in case of an error *)
+                      print_endline ("Failure: " ^ f ^ "\n");
+                      loop db ss
+                    )
+                  | Parser.Error -> ( (* failed to parse input *)
+                      print_endline "\nDoes not parse\n";
+                      loop db ss
+                    )
+                  | Lexer.EndInput -> exit 0 (* EOF *)
+                  | _ -> ( (* Any other error *)
+                      print_endline "\nUnrecognized error\n";
+                      loop db ss
+                    )
+                )
+              | [] -> return ()
+            )
+          in
+          print_endline ("Opening file " ^ filename ^ "\n");
+          let file_lines = In_channel.read_lines filename in
+          let%bind () = loop [] file_lines in
+          print_endline "\nFile contents loaded.\n"
+        |> return 
+        )
+    in
+    return ()
+  )
+
+let command =
+  Command.async
     ~summary:"Parallel Prolog interpreter"
     [%map_open.Command
-      let _filename =
+      let filename =
         flag
-          ~doc:"FILE optional file to read prolog from"
+          ~doc:"FILE to read prolog from"
           "file"
-          (optional string)
+          (required string)
       in
-      fun () -> return ()
-        (* Interface.main filename ~eval_function:(fun db b -> run b db ) *)
+      fun () -> main filename
     ]
 
-(* let () =  *)
-(* let backend_and_settings = Rpc_parallel.Backend_and_settings.T ((module Backend), ()) in *)
-(* Rpc_parallel.start_app *)
-(*   backend_and_settings *)
-(*   Prolog_interpreter.Main.command *)
+let () = Start_app.start_app command
