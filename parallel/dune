@@ -1,5 +1,7 @@
-(library
- (name worker)
- (libraries core rpc_parallel async )
- (preprocess (pps ppx_jane ppx_inline_test))
+(executable
+  (public_name parallel_prolog_interpreter)
+   (name worker)
+    (promote (until-clean))
+     (libraries async core_unix prolog_interpreter rpc_parallel_edit)
+      (preprocess (pps ppx_jane))
 )

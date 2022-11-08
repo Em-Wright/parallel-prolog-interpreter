@@ -2,6 +2,6 @@
  (public_name prolog_interpreter)
  (name main)
   (promote (until-clean))
- (libraries async core_unix prolog_interpreter rpc_parallel)
+ (libraries async core core_unix prolog_interpreter rpc_parallel)
  (preprocess (pps ppx_jane))
 )

@@ -1,0 +1,4 @@
+(library (name rpc_parallel_edit)
+ (libraries async core_unix.command_unix core core_unix.daemon
+  core_kernel.pairing_heap sexplib core_unix.uuid)
+ (preprocess (pps ppx_jane)))
