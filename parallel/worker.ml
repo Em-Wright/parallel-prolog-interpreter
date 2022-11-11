@@ -198,6 +198,12 @@ include Rpc_parallel_edit.Make (T)
 (* TODO - at some point, will need to reformulate this so that we start the
 workers to begin with, rather than only when we get a query. At the moment,
 we'll be starting a new worker to deal with each query. *)
+
+(* TODO - need to extend the timeout time. Also would need to make sure
+the workers are actually being interrupted as needed, and don't just attempt to
+finish computation before handling any queries from the main process.
+Otherwise, we'll never actually manage to take any work from the workers,
+and will end up with one worker doing all the work *)
 let run b db =
   let%bind worker : t Deferred.t =
     spawn_exn
@@ -214,7 +220,6 @@ let run b db =
 
 let main filename =
    (
-    print_endline "\nWelcome to the Prolog Interpreter\n";
     let%bind () = (
           let rec loop db file_lines =
             (
@@ -292,4 +297,20 @@ let command =
       fun () -> main filename
     ]
 
-let () = Start_app.start_app command
+(* TODO - I think this is giving bad output because of the backend I'm
+using here - it's possible I would need to use a For_testing backend.
+Unsure. See parallel_intf.ml or parallel.ml for info about For_testing.
+initialize
+I possibly would have to define a separate library which deals with
+   the expect tests, which uses For_testing, and then another library
+   which could be used by the executable. That sounds like a lot of faff.
+   I could maybe just have a separate tests.ml file which calls
+   this function with
+*)
+let%expect_test "general test" =
+  let%bind _ = main "nqueensgen.pl" in
+  [%expect {|
+    861 |}];
+  return ()
+;;
+

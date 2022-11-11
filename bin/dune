@@ -1,7 +1,17 @@
 (executable
  (public_name prolog_interpreter)
- (name main)
+ (name sequential)
   (promote (until-clean))
+ (modules sequential)
  (libraries async core core_unix prolog_interpreter rpc_parallel)
+ (preprocess (pps ppx_jane))
+)
+
+(executable
+ (public_name parallel_prolog_interpreter)
+  (name parallel)
+   (promote (until-clean))
+ (modules parallel)
+ (libraries async core core_unix parallel_prolog_interpreter rpc_parallel)
  (preprocess (pps ppx_jane))
 )

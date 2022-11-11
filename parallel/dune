@@ -1,7 +1,7 @@
-(executable
-  (public_name parallel_prolog_interpreter)
-   (name worker)
-    (promote (until-clean))
-     (libraries async core_unix prolog_interpreter rpc_parallel_edit)
-      (preprocess (pps ppx_jane))
+(library
+ (name parallel_prolog_interpreter)
+  (inline_tests)
+ (modules start_app worker backend include)
+ (libraries async core_unix prolog_interpreter rpc_parallel_edit)
+ (preprocess (pps ppx_jane ppx_inline_test ppx_expect))
 )

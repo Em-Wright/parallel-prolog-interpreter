@@ -396,7 +396,7 @@ let stack_evaluator_test_suite =
                 )
                 [VarExp "Z"; VarExp "Y"; VarExp "X"; IntExp 10; TermExp("blah", [])]
                 3
-            ), "false\n";
+            ), "====================\nX = tom\nY is free\nZ is free\n====================\ntrue\n";
 
             (string_of_res
                 ( eval_query
