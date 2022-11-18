@@ -11,45 +11,39 @@ module Job = struct
   } [@@deriving bin_io, fields]
 end
 
-module Results = struct
-  type t = {
-    results : (exp * exp) list list;
-    job : Job.t
-  }[@@deriving bin_io]
+module Dec = struct
+  type t = dec [@@deriving bin_io]
 end
 
-module Work = struct
+module Results = struct
+  type t = (exp * exp) list list [@@deriving bin_io]
+end
+
+module Worker_to_toplevel = struct
   type t =
-      Job of Job.t
-    | Clause of exp * exp list
+    Results of Results.t
+    | Job of Job.t
     | Request
+    | No_work
   [@@deriving bin_io]
-  (* the toplevel may pass the worker another clause for the database, or more work to do
-  *)
+end
+
+module Toplevel_to_worker = struct
+  type t = Request
+  [@@deriving bin_io]
 end
 
 module T = struct
-  type 'worker functions = {eval_query : ('worker, unit, Results.t) Rpc_parallel_edit.Function.t}
 
   module Worker_state = struct
-    type init_arg = {
-      b : exp list;
-      db : dec list
-    }
+    type init_arg = dec list
     [@@deriving bin_io]
 
-    (* TODO - make these mutable, so we can update results etc as we go - don't need
-       to be making multiple copies in the eval_inner function *)
-    (* TODO - could add a `done' field here, if we end up having to have a polling
-       process for giving the worker work. We could then have the main process periodically
-       check for results (and take any if there are, resetting results to []), and
-       check if the processing has finished yet. And if so, give it more work. *)
     type t = {
       q : Job.t Deque.t;
       mutable db : dec list;
-      mutable results : (exp * exp) list list; (* TODO - do I actually need to store results in worker state? *)
-      mutable reader : Work.t Pipe.Reader.t;
-      mutable writer : Results.t Pipe.Writer.t
+      mutable reader : Toplevel_to_worker.t Pipe.Reader.t;
+      mutable writer : Worker_to_toplevel.t Pipe.Writer.t
     } [@@deriving fields]
   end
 
@@ -58,11 +52,6 @@ module T = struct
     type t = unit
   end
 
-  (* TODO - would it make sense to have the recursive part as an inner function,
-       then we don't need to pass the db every time? *)
-  (* TODO - might make sense to switch to iteration rather than recursion? Although
-     this is probably compiled in a way that takes advantage of the tail recursion
-  *)
   let eval_inner gs env db  =
     match gs with
     | g1::gl -> (
@@ -184,61 +173,66 @@ module T = struct
     | [] -> []
   ;;
 
-  let main ({q; db; results; reader; writer}: Worker_state.t) =
+  let main (worker_state : Worker_state.t) =
+      (* ({q; db; results; reader; writer}: Worker_state.t) = *)
     let rec main_inner results =
-      (* check for requests for work from the toplevel *)
-      if not (Pipe.is_empty reader) then (
-        match%bind Pipe.read reader with
-        | `Eof -> return ()
-        | `Ok (Request) -> (
-             match Deque.dequeue_front q with
-               | None -> Pipe.write writer {results; job = {goals = []; env = []}}
-               | Some job -> Pipe.write writer {results; job}
-           )
-        (* write work to writer*)
-        | `Ok (Job job) -> Deque.enqueue_front job
-        | `Ok (Clause c) -> Worker_state.set_db worker_state (c::db)
-      ) else 
-
-    (* TODO - check for updates from toplevel and handle those before continuing work *)
-    match Deque.dequeue_back q with
-    | None -> results (* TODO - add results to pipe to send to toplevel *)
-    | Some {goals =[]; env} -> main_inner (env::results)
-    | Some {goals; env} -> (
-        List.iter
-          ( eval_inner goals env db)
-          ~f:( fun (goals, env) -> Deque.enqueue_back q {goals; env} );
-        main_inner results
-      )
+      let%bind _check_for_update =
+        if not (Pipe.is_empty worker_state.reader) then (
+          match%bind Pipe.read worker_state.reader with
+          | `Eof -> return ()
+          | `Ok (Request) -> (
+              match Deque.dequeue_front worker_state.q with
+              | None -> Pipe.write worker_state.writer No_work
+              | Some job -> Pipe.write worker_state.writer (Job job)
+            )
+        ) else Deferred.unit
+      in
+      match Deque.dequeue_back worker_state.q with
+      | None -> (let%bind _write = Pipe.write worker_state.writer (Results results) in
+                 Pipe.write worker_state.writer Request
+                   (* Need to wait for a response before we decide to keep looping.
+                   Could do something with an ivar? Or we could just return here, and
+                   then the toplevel has to call main/eval again to get us to do
+                   any more work. That might actually be easiest? But then we need to
+                   be able to call this function with additional work to do as an arg.
+                      In which case we wouldn't need the toplevel to be able to send work
+                      via a pipe - it would only be sent when we call this function
+                   *)
+                )
+      | Some {goals =[]; env} -> main_inner (env::results)
+      | Some {goals; env} -> (
+          List.iter
+            ( eval_inner goals env worker_state.db)
+            ~f:( fun (goals, env) -> Deque.enqueue_back worker_state.q {goals; env} );
+          main_inner results
+        )
     in
-    main_inner results
+    main_inner []
   ;;
+
 
   let initialise (init_arg : Worker_state.init_arg) : Worker_state.t  =
     let q = Deque.create () in
-    Deque.enqueue_front q (init_arg.b, []);
     let (_, temp_writer) = Pipe.create () in
-    {q; db = init_arg.db; results = []; reader = Pipe.empty (); writer = temp_writer}
+    {q; db = init_arg; reader = Pipe.empty (); writer = temp_writer}
 
+  type 'worker functions = {eval_query : ('worker, Job.t, unit) Rpc_parallel_edit.Function.t;
+                           update_db : ('worker, dec, unit) Rpc_parallel_edit.Function.t}
 
   module Functions
       (C : Rpc_parallel_edit.Creator
        with type worker_state := Worker_state.t
         and type connection_state := Connection_state.t) =
   struct
-    let eval_query_impl ~worker_state ~conn_state:() _ =
-      main worker_state |> return
+    let eval_query_impl ~worker_state ~conn_state:() job =
+      Deque.enqueue_back worker_state.q job;
+      main worker_state
     ;;
 
-    (* TODO - we can probably have the pipe creation + adding to the worker state in here,
-       rather than having to have an implementation outside this Functions module?
-       Do I need to have a ref to a pipe writer, or make it mutable? And optional, since we
-       don't have a pipe when we start - not until the toplevel requests they be created.
-       Maybe the formulation here is to have the toplevel create a pipe through which the
-       worker can send them stuff, and then call the function which create the pipe which
-       they can send work to the worker through, passing the initial set of work at the same
-       time, so this toplevel_to_worker_pipe function also calls `main' to start evaluation
-    *)
+    let update_db_impl ~worker_state ~conn_state:() d =
+      Worker_state.set_db worker_state (d::worker_state.db) |> return
+    ;;
+
     let worker_to_toplevel_pipe_impl ~worker_state ~conn_state:() _ =
       let (reader, writer) = Pipe.create () in
       Worker_state.set_writer worker_state writer;
@@ -250,27 +244,32 @@ module T = struct
     let eval_query =
       C.create_rpc
         ~f:eval_query_impl
-        ~bin_input:(Unit.bin_t)
-        ~bin_output:(Results.bin_t)
+        ~bin_input:(Job.bin_t)
+        ~bin_output:(Unit.bin_t)
         ()
 
+    let update_db =
+      C.create_rpc
+        ~f:update_db_impl
+        ~bin_input:Dec.bin_t
+        ~bin_output:Unit.bin_t
+        ()
     let worker_to_toplevel_pipe =
       C.create_pipe
         ~f:worker_to_toplevel_pipe_impl
         ~bin_input:Unit.bin_t
-        ~bin_output:Results.bin_t
+        ~bin_output:Worker_to_toplevel.bin_t
         ()
 
     let toplevel_to_worker_pipe =
-      (* TODO write a Work module *)
       C.create_reverse_pipe
         ~f:toplevel_to_worker_pipe_impl
         ~bin_query:Unit.bin_t
-        ~bin_update:Work.bin_t
+        ~bin_update:Toplevel_to_worker.bin_t
         ~bin_response:Unit.bin_t
         ()
 
-    let functions = {eval_query}
+    let functions = {eval_query; update_db}
     let init_worker_state init_arg = initialise init_arg |> return
     let init_connection_state ~connection:_ ~worker_state:_ = return
 
