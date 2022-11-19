@@ -19,13 +19,7 @@ type exp =
 [@@deriving equal, bin_io]
 
 (* Declarations *)
-module Dec = struct
-  type t =
-    | Clause of exp * (exp list)  (* Head :- Body. *)
-    | Query of (exp list)         (* ?- Body.      *)
-  [@@deriving equal, bin_io]
-end
-type dec = Dec.t
-(*   | Clause of exp * (exp list)  (\* Head :- Body. *\) *)
-(*   | Query of (exp list)         (\* ?- Body.      *\) *)
-(* [@@deriving equal, bin_io] *)
+type dec =
+  | Clause of exp * (exp list)  (* Head :- Body. *)
+  | Query of (exp list)         (* ?- Body.      *)
+[@@deriving equal, bin_io]

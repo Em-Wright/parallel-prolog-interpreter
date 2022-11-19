@@ -24,12 +24,6 @@ module Worker_to_toplevel = struct
     Results of Results.t
     | Job of Job.t
     | Request
-    | No_work
-  [@@deriving bin_io]
-end
-
-module Toplevel_to_worker = struct
-  type t = Request
   [@@deriving bin_io]
 end
 
@@ -42,7 +36,7 @@ module T = struct
     type t = {
       q : Job.t Deque.t;
       mutable db : dec list;
-      mutable reader : Toplevel_to_worker.t Pipe.Reader.t;
+      mutable reader : unit Pipe.Reader.t;
       mutable writer : Worker_to_toplevel.t Pipe.Writer.t
     } [@@deriving fields]
   end
@@ -174,30 +168,42 @@ module T = struct
   ;;
 
   let main (worker_state : Worker_state.t) =
-      (* ({q; db; results; reader; writer}: Worker_state.t) = *)
+    (* Clear the pipe of any previous requests for work which
+    are no longer relevant *)
+    Pipe.clear worker_state.reader;
     let rec main_inner results =
-      let%bind _check_for_update =
-        if not (Pipe.is_empty worker_state.reader) then (
-          match%bind Pipe.read worker_state.reader with
-          | `Eof -> return ()
-          | `Ok (Request) -> (
-              match Deque.dequeue_front worker_state.q with
-              | None -> Pipe.write worker_state.writer No_work
-              | Some job -> Pipe.write worker_state.writer (Job job)
+      let%bind _check_for_requests =
+        (* NOTE - if I ever use a `read' function to check if there's
+        anything in the pipe, make sure to use read_now - `read' waits
+           until there's a value available.
+        *)
+          match Pipe.peek worker_state.reader with
+          | None -> Deferred.unit
+          | Some () -> (
+              (* We only give out work if we have at least 2 jobs on our stack.
+              Otherwise, we give away all our work, and have to ask the
+              toplevel for more *)
+              if (Deque.length worker_state.q) > 1 then (
+                match Deque.dequeue_front worker_state.q with
+                | None -> Deferred.unit (* Should never happen *)
+                | Some job -> ignore (Pipe.read_now worker_state.reader);
+                  Pipe.write worker_state.writer (Job job)
+              ) else Deferred.unit
+              (* we don't have any work to
+                 give the main process. We don't send a request
+                 for more work here, since we'll be sending one later
+                 anyway, so it would be redundant
+
+                 TODO - maybe I ought to add a message type which says
+                 `I don't have any work for you' which can be used where we
+                 only have 1 job on our stack? Hopefully this happens
+                 rarely enough that I don't need to think about it
+              *)
             )
-        ) else Deferred.unit
       in
       match Deque.dequeue_back worker_state.q with
       | None -> (let%bind _write = Pipe.write worker_state.writer (Results results) in
                  Pipe.write worker_state.writer Request
-                   (* Need to wait for a response before we decide to keep looping.
-                   Could do something with an ivar? Or we could just return here, and
-                   then the toplevel has to call main/eval again to get us to do
-                   any more work. That might actually be easiest? But then we need to
-                   be able to call this function with additional work to do as an arg.
-                      In which case we wouldn't need the toplevel to be able to send work
-                      via a pipe - it would only be sent when we call this function
-                   *)
                 )
       | Some {goals =[]; env} -> main_inner (env::results)
       | Some {goals; env} -> (
@@ -216,8 +222,12 @@ module T = struct
     let (_, temp_writer) = Pipe.create () in
     {q; db = init_arg; reader = Pipe.empty (); writer = temp_writer}
 
-  type 'worker functions = {eval_query : ('worker, Job.t, unit) Rpc_parallel_edit.Function.t;
-                           update_db : ('worker, dec, unit) Rpc_parallel_edit.Function.t}
+  type 'worker functions = {
+    eval_query : ('worker, Job.t, unit) Rpc_parallel_edit.Function.t;
+    update_db : ('worker, dec, unit) Rpc_parallel_edit.Function.t;
+    worker_to_toplevel_pipe : ('worker, unit, Worker_to_toplevel.t Pipe.Reader.t) Rpc_parallel_edit.Function.t;
+    toplevel_to_worker_pipe : ('worker, unit * unit Pipe.Reader.t, unit) Rpc_parallel_edit.Function.t
+  }
 
   module Functions
       (C : Rpc_parallel_edit.Creator
@@ -225,7 +235,7 @@ module T = struct
         and type connection_state := Connection_state.t) =
   struct
     let eval_query_impl ~worker_state ~conn_state:() job =
-      Deque.enqueue_back worker_state.q job;
+      Deque.enqueue_back (Worker_state.q worker_state) job;
       main worker_state
     ;;
 
@@ -254,6 +264,7 @@ module T = struct
         ~bin_input:Dec.bin_t
         ~bin_output:Unit.bin_t
         ()
+
     let worker_to_toplevel_pipe =
       C.create_pipe
         ~f:worker_to_toplevel_pipe_impl
@@ -265,11 +276,11 @@ module T = struct
       C.create_reverse_pipe
         ~f:toplevel_to_worker_pipe_impl
         ~bin_query:Unit.bin_t
-        ~bin_update:Toplevel_to_worker.bin_t
+        ~bin_update:Unit.bin_t
         ~bin_response:Unit.bin_t
         ()
 
-    let functions = {eval_query; update_db}
+    let functions = {eval_query; update_db; worker_to_toplevel_pipe; toplevel_to_worker_pipe}
     let init_worker_state init_arg = initialise init_arg |> return
     let init_connection_state ~connection:_ ~worker_state:_ = return
 
@@ -278,85 +289,150 @@ end
 
 include Rpc_parallel_edit.Make (T)
 
-(* NOTE - we need to use functions such that the worker can be interrupted in
-   between executions of jobs on the stack. It would therefore probably be useful
-   to have some sort of stack structure which `interrupts' the worker when anything on it
-   changes - that way, the execution control would be handled by this stack and by
-   the toplevel, rather than by the worker, in which case we can't interrupt it.
-   At initialisation, we could start a function which waits for these interrupts
-   from the stack, and responds to them. This is getting excessively complex for
-   an interpreter though. There must be a way to avoid having to do all of that.
-   We could also have a recursive main process which checks for updates to its state
-   (and we have something in the state to allow the toplevel to make a request for
-   work, or to request a status update - maybe just some sort of flag), and it
-   handles those other requests before it continues with execution of the Prolog.
-   This would rely on the processing model allowing the toplevel to update that state
-   even while the worker is running this recursive function. This is probably
-   doable with a pipe_rpc, since it just requires this worker to check it periodically,
-   and not for the main process to interrupt it.
-
-   The only way to find out is to try it, I guess. Or maybe inspect the parallel.ml
-   really thoroughly.
-
-   So I'll need to initialise each worker, which may involve giving it work.
-   Then need to set up a pipe between the main process and each worker where
-   workers can request work, the toplevel can request work, the worker can send solutions.
-   This is likely to require a very strange message format. Maybe we just have `request
-   for worker' messages in this pipe, and the main process has an rpc which gives the worker
-   work, which the worker adds to its stack, the worker then sends solutions as a response,
-   then starts doing the actual work. If that's not a viable layout, we could also
-   have a separate `start working' call. Or we could have the pipe take messages
-   consisting of a request for work and solutions so far. To be fair, just sending solutions
-   so far might be sufficient, since we would only be sending solutions if we didn't
-   have any work left.
-
-   I am making some assumptions here about how the pipe_rpc actually works -
-   I'm not sure how the worker accesses the reader and writer, exactly, if it
-   can at all.
-
-   Could I use the connection state at all?
-
-   The create_pipe takes a function f, which is given an argument and the pipe writer.
-   The argument is presumably what has been read from the pipe.
-
-   There is also the create_reverse_pipe, which could work in the other direction,
-   giving the worker a pipe reader. This would be more useful. The worker does have to
-   send a response, but "It is up to you whether to send a response before or after
-   finishing with the pipe". Not exactly sure how you go about sending the response
-   without returning from the function though? Unless we call another function, and
-   have a don't_wait_for? That seems like it could go wrong
-
-*)
-
-(* TODO - at some point, will need to reformulate this so that we start the
-workers to begin with, rather than only when we get a query. At the moment,
-we'll be starting a new worker to deal with each query. *)
-
 (* TODO - need to extend the heartbeater timeout time - this is done in the
-   start_app function call. Also would need to make sure
-the workers are actually being interrupted as needed, and don't just attempt to
-finish computation before handling any queries from the main process.
-Otherwise, we'll never actually manage to take any work from the workers,
-and will end up with one worker doing all the work
+   start_app function call.
 *)
-let run b db =
-  let%bind worker : t Deferred.t =
-    spawn_exn
-      ~on_failure:Error.raise
-      ~shutdown_on:Heartbeater_connection_timeout
-      ~redirect_stdout:(`File_append "/Users/em/Documents/diss_stdout.log")
-      ~redirect_stderr:(`File_append "/Users/em/Documents/diss_stderr.log")
-      {b; db}
+
+let init_workers n =
+    Deferred.List.init n
+      ~how:`Parallel
+      ~f:(fun _ ->
+          spawn_exn
+            ~on_failure:Error.raise
+            ~shutdown_on:Heartbeater_connection_timeout
+            ~redirect_stdout:(`File_append "/Users/em/Documents/diss_stdout.log")
+            ~redirect_stderr:(`File_append "/Users/em/Documents/diss_stderr.log")
+            [] (* TODO - should I initialise workers just before starting a query
+               execution, then I can pass the whole db, or do I do it like this? *)
+        )
+  ;;
+
+
+let add_dec_to_db dec workers =
+    match dec with
+    | Clause (h, _) -> (
+        match h with
+        (* don't allow user to add a new definition of true *)
+        | TermExp ("true", _) ->
+          print_string "Can't reassign true predicate\n"; Deferred.unit
+        | TermExp ("is", _) ->
+          print_string "Can't reassign 'is' predicate\n"; Deferred.unit
+        | TermExp ("list", _) ->
+          print_string "Can't reassign 'list' predicate\n"; Deferred.unit
+        | TermExp ("empty_list", _) ->
+          print_string "Can't reassign 'empty_list' predicate\n"; Deferred.unit
+        | TermExp ("equals", _) ->
+          print_string "Can't reassign 'equals' predicate\n"; Deferred.unit
+        | TermExp ("not_equal", _) ->
+          print_string "Can't reassign 'not_equal' predicate\n"; Deferred.unit
+        | TermExp ("less_than", _) ->
+          print_string "Can't reassign 'less_than' predicate\n"; Deferred.unit
+        | TermExp ("greater_than", _) ->
+          print_string "Can't reassign 'greater_than' predicate\n"; Deferred.unit
+        | _ -> Deferred.List.iter ~how:`Parallel workers
+                 ~f:(fun worker ->
+                     let%bind conn = Connection.client_exn worker () in
+                     Connection.run_exn conn ~f:(functions.update_db) ~arg:dec
+                   )
+      )
+    | Query _ -> return ()
+;;
+
+(* TODO - need to think about the fresh variable counter - one per worker??? *)
+
+(* TODO - maybe should create the pipes once for the lifetime of the program,
+   not once per query, which is what is happening here
+*)
+
+let run b workers =
+  (* the workers all already have the db so far.
+     For now, just handle having 2 workers.
+     - set the first one off with work
+     - request more work from it
+     - give work to the second one
+     - monitor for results and requests for work
+  *)
+  (* NOTE - this just uses 1 worker atm *)
+  let job : Job.t = {goals = b; env = []} in
+  let%bind conns = Deferred.List.map workers
+      ~f:( fun worker -> Connection.client_exn worker () )
   in
-  let%bind conn = Connection.client_exn worker () in
-  Connection.run_exn conn ~f:(functions.eval_query) ~arg:()
-
-
+  let%bind readers = Deferred.List.map conns
+      ~f:(fun conn ->
+          Connection.run_exn conn
+            ~f:(functions.worker_to_toplevel_pipe) ~arg:()
+        )
+  in
+  let%bind writers = Deferred.List.map conns
+      ~f:(fun conn ->
+          let (reader, writer) = Pipe.create () in
+          let%bind _ =
+          Connection.run_exn conn
+            ~f:(functions.toplevel_to_worker_pipe) ~arg:((), reader)
+          in
+          return writer
+        )
+  in
+  don't_wait_for
+    (
+      Connection.run_exn (List.nth_exn conns 0) ~f:(functions.eval_query) ~arg:job
+    );
+  Pipe.write_without_pushback  (List.nth_exn writers 0) ();
+  (* monitor reader for results *)
+  (* values_available returns a Deferred which becomes determined when there's a
+  value available. No guarantees that another process won't have turned up and
+  read the value before you get to it, but since we only have one process reading
+  from this pipe, that's fine
+  *)
+  let%bind _ = Pipe.values_available (List.nth_exn readers 0) in
+  let%bind _ =
+  match%bind Pipe.read (List.nth_exn readers 0) with
+  | `Eof -> (print_endline "No results from worker"; return ())
+  | `Ok msg -> (
+      match msg with
+      | Worker_to_toplevel.Results _ -> return ()
+      | Worker_to_toplevel.Job job ->
+        don't_wait_for
+          (
+            Connection.run_exn (List.nth_exn conns 1) ~f:(functions.eval_query) ~arg:job
+          ); return ()
+      | Request -> print_endline "Was meant to get results, but got\
+                                           a request for work instead.";
+        return ()
+    )
+  in
+  let%bind res1 = 
+  match%bind Pipe.read (List.nth_exn readers 0) with
+  | `Eof -> (print_endline "No results from worker"; return [])
+  | `Ok msg -> (
+      match msg with
+      | Worker_to_toplevel.Results res -> return res
+      | Worker_to_toplevel.Job _
+      | Request -> print_endline "Was meant to get results, but got\
+                                  a request for work instead.";
+        return []
+    )
+  in
+  let%bind res2 = 
+    match%bind Pipe.read (List.nth_exn readers 1) with
+    | `Eof -> (print_endline "No results from worker"; return [])
+    | `Ok msg -> (
+        match msg with
+        | Worker_to_toplevel.Results res -> return res
+        | Worker_to_toplevel.Job _
+        | Request -> print_endline "Was meant to get results, but got\
+                                    a request for work instead.";
+          return []
+      )
+  in
+  res1@res2 |> return
+;;
 
 let main filename =
+  let%bind workers = init_workers 2 in
    (
     let%bind () = (
-          let rec loop db file_lines =
+          let rec loop file_lines =
             (
               match file_lines with
               | s::ss -> (
@@ -370,9 +446,9 @@ let main filename =
 		                      )
 	                    ) lexbuf
                     in
-                    let%bind newdb = (
+                    let%bind _ = (
                     match dec with
-                    | Clause (_, _) -> add_dec_to_db (dec, db) |> return
+                    | Clause (_, _) -> add_dec_to_db dec workers
                     | Query b -> (
                         print_endline s;
                         (* find all uniq VarExps in query *)
@@ -380,30 +456,30 @@ let main filename =
                         (* find num of VarExps in query *)
                         let orig_vars_num = List.length orig_vars in
                         (* evaluate query *)
-                        let%bind res = run b db in
+                        let%bind res = run b workers in
                         (* print the result *)
                         print_string "\n";
                         print_endline (string_of_res (res) orig_vars orig_vars_num);
                         print_string "\n\n";
                         (* reset fresh variable counter *)
                         reset ();
-                        return db
+                        Deferred.unit
                       )
                   ) in
-                    loop newdb ss
+                    loop ss
                   ) with
                   | Failure f -> ( (* in case of an error *)
                       print_endline ("Failure: " ^ f ^ "\n");
-                      loop db ss
+                      loop ss
                     )
                   | Parser.Error -> ( (* failed to parse input *)
                       print_endline "\nDoes not parse\n";
-                      loop db ss
+                      loop ss
                     )
                   | Lexer.EndInput -> exit 0 (* EOF *)
                   | _ -> ( (* Any other error *)
                       print_endline "\nUnrecognized error\n";
-                      loop db ss
+                      loop ss
                     )
                 )
               | [] -> return ()
@@ -411,7 +487,7 @@ let main filename =
           in
           print_endline ("Opening file " ^ filename ^ "\n");
           let file_lines = In_channel.read_lines filename in
-          let%bind () = loop [] file_lines in
+          let%bind () = loop file_lines in
           print_endline "\nFile contents loaded.\n"
         |> return
         )
@@ -431,21 +507,4 @@ let command =
       in
       fun () -> main filename
     ]
-
-(* TODO - I think this is giving bad output because of the backend I'm
-using here - it's possible I would need to use a For_testing backend.
-Unsure. See parallel_intf.ml or parallel.ml for info about For_testing.
-initialize
-I possibly would have to define a separate library which deals with
-   the expect tests, which uses For_testing, and then another library
-   which could be used by the executable. That sounds like a lot of faff.
-   I could maybe just have a separate tests.ml file which calls
-   this function with
-*)
-(* let%expect_test "general test" = *)
-(*   let%bind _ = main "nqueensgen.pl" in *)
-(*   [%expect {| *)
-(*     861 |}]; *)
-(*   return () *)
-(* ;; *)
 
