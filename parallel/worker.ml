@@ -352,7 +352,6 @@ let run b workers =
      - give work to the second one
      - monitor for results and requests for work
   *)
-  (* NOTE - this just uses 1 worker atm *)
   let job : Job.t = {goals = b; env = []} in
   let%bind conns = Deferred.List.map workers
       ~f:( fun worker -> Connection.client_exn worker () )
