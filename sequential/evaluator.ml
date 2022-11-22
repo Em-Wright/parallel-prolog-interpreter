@@ -197,9 +197,8 @@ let command =
          flag
            ~doc:"FILE optional file to read prolog from"
            "file"
-           (optional string)
+           (required string)
        in
        fun () ->
-         print_endline "does this work";
          Interface.main filename ~eval_function:(fun db b -> eval_query (b, db, []) )
     ]
