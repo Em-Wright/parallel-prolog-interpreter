@@ -173,8 +173,8 @@ module T = struct
     Pipe.clear worker_state.reader;
     let rec main_inner results =
       let%bind _check_for_requests =
-        (* NOTE - if I ever use a `read' function to check if there's
-        anything in the pipe, make sure to use read_now - `read' waits
+        (* NOTE - if you ever use a `read' function to check if there's
+           anything in the pipe, make sure to use read_now - `read' waits
            until there's a value available.
         *)
           match Pipe.peek worker_state.reader with
@@ -289,26 +289,47 @@ end
 
 include Rpc_parallel_edit.Make (T)
 
+module Worker_info = struct
+  type t = {
+    conn : Connection.t;
+    reader : Worker_to_toplevel.t Pipe.Reader.t;
+    writer : unit Pipe.Writer.t
+  } [@@deriving fields]
+end
+
 (* TODO - need to extend the heartbeater timeout time - this is done in the
    start_app function call.
 *)
 
-let init_workers n =
+let init_workers n : Worker_info.t list Deferred.t =
     Deferred.List.init n
       ~how:`Parallel
       ~f:(fun _ ->
-          spawn_exn
+          let%bind worker = spawn_exn
             ~on_failure:Error.raise
             ~shutdown_on:Heartbeater_connection_timeout
             ~redirect_stdout:(`File_append "/Users/em/Documents/diss_stdout.log")
             ~redirect_stderr:(`File_append "/Users/em/Documents/diss_stderr.log")
-            [] (* TODO - should I initialise workers just before starting a query
+            []
+            (* TODO - should I initialise workers just before starting a query
                execution, then I can pass the whole db, or do I do it like this? *)
+          in
+          let%bind conn = Connection.client_exn worker () in
+          let%bind reader =
+            Connection.run_exn conn
+              ~f:(functions.worker_to_toplevel_pipe) ~arg:()
+          in
+          let (worker_reader, writer) = Pipe.create () in
+          let%bind _ =
+            Connection.run_exn conn
+              ~f:(functions.toplevel_to_worker_pipe) ~arg:((), worker_reader)
+          in
+          Worker_info.Fields.create ~conn ~reader ~writer |> return
         )
   ;;
 
 
-let add_dec_to_db dec workers =
+let add_dec_to_db dec workers_info =
     match dec with
     | Clause (h, _) -> (
         match h with
@@ -329,63 +350,51 @@ let add_dec_to_db dec workers =
           print_string "Can't reassign 'less_than' predicate\n"; Deferred.unit
         | TermExp ("greater_than", _) ->
           print_string "Can't reassign 'greater_than' predicate\n"; Deferred.unit
-        | _ -> Deferred.List.iter ~how:`Parallel workers
-                 ~f:(fun worker ->
-                     let%bind conn = Connection.client_exn worker () in
-                     Connection.run_exn conn ~f:(functions.update_db) ~arg:dec
+        | _ -> Deferred.List.iter ~how:`Parallel workers_info
+                 ~f:(fun worker_info ->
+                     Connection.run_exn (Worker_info.conn worker_info) ~f:(functions.update_db) ~arg:dec
                    )
       )
     | Query _ -> return ()
 ;;
 
-(* TODO - need to think about the fresh variable counter - one per worker??? *)
+(* TODO - need to think about the fresh variable counter - one per worker? They only
+interfere if they occur in the same job, so one per worker is working fine *)
 
 (* TODO - maybe should create the pipes once for the lifetime of the program,
    not once per query, which is what is happening here
 *)
 
-let run b workers =
-  (* the workers all already have the db so far.
-     For now, just handle having 2 workers.
-     - set the first one off with work
-     - request more work from it
-     - give work to the second one
-     - monitor for results and requests for work
-  *)
-  let job : Job.t = {goals = b; env = []} in
-  let%bind conns = Deferred.List.map workers
-      ~f:( fun worker -> Connection.client_exn worker () )
-  in
-  let%bind readers = Deferred.List.map conns
-      ~f:(fun conn ->
-          Connection.run_exn conn
-            ~f:(functions.worker_to_toplevel_pipe) ~arg:()
-        )
-  in
-  let%bind writers = Deferred.List.map conns
-      ~f:(fun conn ->
-          let (reader, writer) = Pipe.create () in
-          let%bind _ =
-          Connection.run_exn conn
-            ~f:(functions.toplevel_to_worker_pipe) ~arg:((), reader)
-          in
-          return writer
-        )
-  in
+let run b worker_info_list =
+  let num_workers = List.length worker_info_list in
+  (* TODO - these are going to need to be mutable *)
+  let have_work = List.init num_workers  ~f:(fun _ -> ref false) in
+  let requested_work_from = List.init num_workers  ~f:(fun _ -> ref false) in
+  let first_job : Job.t = {goals = b; env = []} in
   don't_wait_for
     (
-      Connection.run_exn (List.nth_exn conns 0) ~f:(functions.eval_query) ~arg:job
+      Connection.run_exn (Worker_info.conn (List.nth_exn worker_info_list 0)) ~f:(functions.eval_query) ~arg:first_job
     );
-  Pipe.write_without_pushback  (List.nth_exn writers 0) ();
+  (* TODO set 0th value of have_work to true*)
+  Pipe.write_without_pushback  (List.nth_exn worker_info_list 0).writer ();
+  (* TODO set 0th value of requested_work_from to true *)
+
+  let rec run_inner results =
+    (* TODO - check for updates from workers, handle accordingly. Give any work we have to any
+    workers which do not currently have work *)
+  in
+  run_inner []
+
   (* monitor reader for results *)
   (* values_available returns a Deferred which becomes determined when there's a
   value available. No guarantees that another process won't have turned up and
   read the value before you get to it, but since we only have one process reading
   from this pipe, that's fine
   *)
-  let%bind _ = Pipe.values_available (List.nth_exn readers 0) in
+  let%bind _ = Pipe.values_available (Worker_info.reader (List.nth_exn worker_info_list 0))
+  in
   let%bind _ =
-  match%bind Pipe.read (List.nth_exn readers 0) with
+    match%bind Pipe.read (Worker_info.reader (List.nth_exn worker_info_list 0)) with
   | `Eof -> (print_endline "No results from worker"; return ())
   | `Ok msg -> (
       match msg with
@@ -393,15 +402,15 @@ let run b workers =
       | Worker_to_toplevel.Job job ->
         don't_wait_for
           (
-            Connection.run_exn (List.nth_exn conns 1) ~f:(functions.eval_query) ~arg:job
+            Connection.run_exn (Worker_info.conn (List.nth_exn worker_info_list 1)) ~f:(functions.eval_query) ~arg:job
           ); return ()
       | Request -> print_endline "Was meant to get results, but got\
                                            a request for work instead.";
         return ()
     )
   in
-  let%bind res1 = 
-  match%bind Pipe.read (List.nth_exn readers 0) with
+  let%bind res1 =
+    match%bind Pipe.read (Worker_info.reader (List.nth_exn worker_info_list 0)) with
   | `Eof -> (print_endline "No results from worker"; return [])
   | `Ok msg -> (
       match msg with
@@ -413,7 +422,7 @@ let run b workers =
     )
   in
   let%bind res2 = 
-    match%bind Pipe.read (List.nth_exn readers 1) with
+    match%bind Pipe.read (Worker_info.reader (List.nth_exn worker_info_list 1)) with
     | `Eof -> (print_endline "No results from worker"; return [])
     | `Ok msg -> (
         match msg with
@@ -428,7 +437,7 @@ let run b workers =
 ;;
 
 let main filename =
-  let%bind workers = init_workers 2 in
+  let%bind workers_info = init_workers 2 in
    (
     let%bind () = (
           let rec loop file_lines =
@@ -447,7 +456,7 @@ let main filename =
                     in
                     let%bind _ = (
                     match dec with
-                    | Clause (_, _) -> add_dec_to_db dec workers
+                    | Clause (_, _) -> add_dec_to_db dec workers_info
                     | Query b -> (
                         print_endline s;
                         (* find all uniq VarExps in query *)
@@ -455,7 +464,7 @@ let main filename =
                         (* find num of VarExps in query *)
                         let orig_vars_num = List.length orig_vars in
                         (* evaluate query *)
-                        let%bind res = run b workers in
+                        let%bind res = run b workers_info in
                         (* print the result *)
                         print_string "\n";
                         print_endline (string_of_res (res) orig_vars orig_vars_num);
