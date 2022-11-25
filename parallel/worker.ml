@@ -23,7 +23,6 @@ module Worker_to_toplevel = struct
   type t =
     Results of Results.t
     | Job of Job.t
-    | Request
   [@@deriving bin_io]
 end
 
@@ -193,18 +192,11 @@ module T = struct
                  give the main process. We don't send a request
                  for more work here, since we'll be sending one later
                  anyway, so it would be redundant
-
-                 TODO - maybe I ought to add a message type which says
-                 `I don't have any work for you' which can be used where we
-                 only have 1 job on our stack? Hopefully this happens
-                 rarely enough that I don't need to think about it
               *)
             )
       in
       match Deque.dequeue_back worker_state.q with
-      | None -> (let%bind _write = Pipe.write worker_state.writer (Results results) in
-                 Pipe.write worker_state.writer Request
-                )
+      | None -> Pipe.write worker_state.writer (Results results)
       | Some {goals =[]; env} -> main_inner (env::results)
       | Some {goals; env} -> (
           List.iter
@@ -358,86 +350,88 @@ let add_dec_to_db dec workers_info =
     | Query _ -> return ()
 ;;
 
-(* TODO - need to think about the fresh variable counter - one per worker? They only
-interfere if they occur in the same job, so one per worker is working fine *)
-
-(* TODO - maybe should create the pipes once for the lifetime of the program,
-   not once per query, which is what is happening here
-*)
-
 let run b worker_info_list =
   let num_workers = List.length worker_info_list in
-  (* TODO - these are going to need to be mutable *)
-  let have_work = List.init num_workers  ~f:(fun _ -> ref false) in
-  let requested_work_from = List.init num_workers  ~f:(fun _ -> ref false) in
-  let first_job : Job.t = {goals = b; env = []} in
-  don't_wait_for
-    (
-      Connection.run_exn (Worker_info.conn (List.nth_exn worker_info_list 0)) ~f:(functions.eval_query) ~arg:first_job
-    );
-  (* TODO set 0th value of have_work to true*)
-  Pipe.write_without_pushback  (List.nth_exn worker_info_list 0).writer ();
-  (* TODO set 0th value of requested_work_from to true *)
-
+  (* TODO
+     Would it make sense to have all worker info in this hashtable, including whether it has work,
+     and whether we've requested work from it? Deferred.Table isn't a thing
+     Leave it as this for now - can change later if needed
+  *)
+  let have_work = Hashtbl.of_alist_exn (module Int) (List.init num_workers ~f:(fun i -> (i, false))) in
+  let requested_work_from = Hashtbl.of_alist_exn (module Int) (List.init num_workers ~f:(fun i -> (i, false))) in
+  let give_work index job =
+    don't_wait_for
+      (
+        Connection.run_exn
+          (Worker_info.conn (List.nth_exn worker_info_list index))
+          ~f:(functions.eval_query)
+          ~arg:job
+      );
+    Hashtbl.set have_work ~key:index ~data:true
+  in
+  let request_work index =
+    Pipe.write_without_pushback  (List.nth_exn worker_info_list index).writer ();
+    Hashtbl.set requested_work_from ~key:index ~data:true
+  in
+  give_work 0 {goals = b; env = []};
+  request_work 0;
   let rec run_inner results =
-    (* TODO - check for updates from workers, handle accordingly. Give any work we have to any
-    workers which do not currently have work *)
+    let (updated_results, new_jobs) =
+      List.foldi ~init:(results, []) worker_info_list ~f:(fun index (acc_res, acc_jobs) {conn=_; reader; writer=_} ->
+          match Pipe.read_now reader with
+          | `Nothing_available -> (acc_res, acc_jobs)
+          | `Eof -> print_endline ("Pipe closed unexpectedly in worker "^ (Int.to_string index));
+            (acc_res, acc_jobs)
+          | `Ok (Job job) ->
+            print_endline "got job from worker";
+            Hashtbl.set requested_work_from ~key:index ~data:false;
+            (acc_res, job::acc_jobs)
+          | `Ok (Results results) ->
+            print_endline "got results from worker";
+            Hashtbl.set have_work ~key:index ~data:false;
+            (results@acc_res, acc_jobs)
+        )
+    in
+    (* give new_jobs to any idle workers and update have_work accordingly *)
+    let idle = Hashtbl.filter have_work ~f:(fun b -> not b) in
+    if Hashtbl.length idle < List.length new_jobs then
+      print_endline "More jobs than idle workers. This state should not occur";
+    List.iter new_jobs ~f:(fun job ->
+        (* find any idle worker, give it work, mark it as not idle *)
+        (* using choose_exn here, since we shouldn't have more jobs than idle workers, in
+        the current scheme *)
+        let (index, _ ) = Hashtbl.choose_exn idle in
+        Hashtbl.remove idle index;
+        give_work index job
+      );
+    (* if, after handing out jobs, the number of idle workers > the number of workers we've requested_work_from
+       and there are still workers which have work but we have not requested work from, request work from these
+       workers *)
+    let num_requested = Hashtbl.count requested_work_from ~f:Fn.id in
+    if (num_requested < Hashtbl.length idle) then (
+      let not_requested = Hashtbl.filter requested_work_from ~f:(fun b -> not b) in
+      let num_to_request = Int.min (Hashtbl.length idle) (Hashtbl.length not_requested) in
+      List.iter (List.init num_to_request ~f:Fn.id) ~f:( fun _ ->
+          let (index, _ ) = Hashtbl.choose_exn not_requested in
+          Hashtbl.remove not_requested index;
+          request_work index
+      )
+    );
+    (* if all workers now have no work, return the accumulated results. Otherwise,
+    repeat
+    *)
+    if (Hashtbl.count have_work ~f:Fn.id) = 0 then
+      return updated_results
+    else
+      (
+      let%bind _ = Clock.after (Time.Span.of_ns 1.0) in
+      run_inner updated_results)
   in
   run_inner []
-
-  (* monitor reader for results *)
-  (* values_available returns a Deferred which becomes determined when there's a
-  value available. No guarantees that another process won't have turned up and
-  read the value before you get to it, but since we only have one process reading
-  from this pipe, that's fine
-  *)
-  let%bind _ = Pipe.values_available (Worker_info.reader (List.nth_exn worker_info_list 0))
-  in
-  let%bind _ =
-    match%bind Pipe.read (Worker_info.reader (List.nth_exn worker_info_list 0)) with
-  | `Eof -> (print_endline "No results from worker"; return ())
-  | `Ok msg -> (
-      match msg with
-      | Worker_to_toplevel.Results _ -> return ()
-      | Worker_to_toplevel.Job job ->
-        don't_wait_for
-          (
-            Connection.run_exn (Worker_info.conn (List.nth_exn worker_info_list 1)) ~f:(functions.eval_query) ~arg:job
-          ); return ()
-      | Request -> print_endline "Was meant to get results, but got\
-                                           a request for work instead.";
-        return ()
-    )
-  in
-  let%bind res1 =
-    match%bind Pipe.read (Worker_info.reader (List.nth_exn worker_info_list 0)) with
-  | `Eof -> (print_endline "No results from worker"; return [])
-  | `Ok msg -> (
-      match msg with
-      | Worker_to_toplevel.Results res -> return res
-      | Worker_to_toplevel.Job _
-      | Request -> print_endline "Was meant to get results, but got\
-                                  a request for work instead.";
-        return []
-    )
-  in
-  let%bind res2 = 
-    match%bind Pipe.read (Worker_info.reader (List.nth_exn worker_info_list 1)) with
-    | `Eof -> (print_endline "No results from worker"; return [])
-    | `Ok msg -> (
-        match msg with
-        | Worker_to_toplevel.Results res -> return res
-        | Worker_to_toplevel.Job _
-        | Request -> print_endline "Was meant to get results, but got\
-                                    a request for work instead.";
-          return []
-      )
-  in
-  res1@res2 |> return
 ;;
 
 let main filename =
-  let%bind workers_info = init_workers 2 in
+  let%bind workers_info = init_workers 4 in
    (
     let%bind () = (
           let rec loop file_lines =
@@ -456,8 +450,10 @@ let main filename =
                     in
                     let%bind _ = (
                     match dec with
-                    | Clause (_, _) -> add_dec_to_db dec workers_info
+                    | Clause (_, _) -> print_endline "adding to db";
+                      add_dec_to_db dec workers_info
                     | Query b -> (
+                        print_endline "got query";
                         print_endline s;
                         (* find all uniq VarExps in query *)
                         let orig_vars = uniq (find_vars b) in
