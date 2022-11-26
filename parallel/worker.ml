@@ -352,14 +352,24 @@ let add_dec_to_db dec workers_info =
 
 let run b worker_info_list =
   let num_workers = List.length worker_info_list in
-  (* TODO
-     Would it make sense to have all worker info in this hashtable, including whether it has work,
-     and whether we've requested work from it? Deferred.Table isn't a thing
-     Leave it as this for now - can change later if needed
-  *)
-  let have_work = Hashtbl.of_alist_exn (module Int) (List.init num_workers ~f:(fun i -> (i, false))) in
-  let requested_work_from = Hashtbl.of_alist_exn (module Int) (List.init num_workers ~f:(fun i -> (i, false))) in
+  let have_work__requested_work = Hashtbl.of_alist_exn (module Int)
+      (List.init num_workers ~f:(fun i -> (i, (false, false)))) in
+  let update_have_work index b =
+    Hashtbl.update have_work__requested_work index ~f:(fun data_opt ->
+        match data_opt with
+        | Some (_, requested) -> (b, requested)
+        | None -> (b, false)
+      )
+  in
+  let update_requested_work index b =
+    Hashtbl.update have_work__requested_work index ~f:(fun data_opt ->
+        match data_opt with
+        | Some (have_work , _) -> (have_work, b)
+        | None -> (true, b)
+      )
+  in
   let give_work index job =
+    print_endline ("giving work to worker "^(Int.to_string index));
     don't_wait_for
       (
         Connection.run_exn
@@ -367,11 +377,12 @@ let run b worker_info_list =
           ~f:(functions.eval_query)
           ~arg:job
       );
-    Hashtbl.set have_work ~key:index ~data:true
+    update_have_work index true
   in
   let request_work index =
+    print_endline ("requesting work from worker "^(Int.to_string index));
     Pipe.write_without_pushback  (List.nth_exn worker_info_list index).writer ();
-    Hashtbl.set requested_work_from ~key:index ~data:true
+    update_requested_work index true
   in
   give_work 0 {goals = b; env = []};
   request_work 0;
@@ -383,17 +394,17 @@ let run b worker_info_list =
           | `Eof -> print_endline ("Pipe closed unexpectedly in worker "^ (Int.to_string index));
             (acc_res, acc_jobs)
           | `Ok (Job job) ->
-            print_endline "got job from worker";
-            Hashtbl.set requested_work_from ~key:index ~data:false;
+            print_endline ("got job from worker " ^ (Int.to_string index));
+            update_requested_work index false;
             (acc_res, job::acc_jobs)
           | `Ok (Results results) ->
-            print_endline "got results from worker";
-            Hashtbl.set have_work ~key:index ~data:false;
+            print_endline ("got results from worker " ^ (Int.to_string index));
+            Hashtbl.set have_work__requested_work ~key:index ~data:(false, false);
             (results@acc_res, acc_jobs)
         )
     in
     (* give new_jobs to any idle workers and update have_work accordingly *)
-    let idle = Hashtbl.filter have_work ~f:(fun b -> not b) in
+    let idle = Hashtbl.filter have_work__requested_work ~f:(fun (b, _) -> not b) in
     if Hashtbl.length idle < List.length new_jobs then
       print_endline "More jobs than idle workers. This state should not occur";
     List.iter new_jobs ~f:(fun job ->
@@ -407,9 +418,10 @@ let run b worker_info_list =
     (* if, after handing out jobs, the number of idle workers > the number of workers we've requested_work_from
        and there are still workers which have work but we have not requested work from, request work from these
        workers *)
-    let num_requested = Hashtbl.count requested_work_from ~f:Fn.id in
+    let num_requested = Hashtbl.count have_work__requested_work ~f:(fun (_, b) -> b) in
     if (num_requested < Hashtbl.length idle) then (
-      let not_requested = Hashtbl.filter requested_work_from ~f:(fun b -> not b) in
+      let not_requested = Hashtbl.filter have_work__requested_work
+          ~f:(fun (have_work, requested_work) -> have_work && (not requested_work) ) in
       let num_to_request = Int.min (Hashtbl.length idle) (Hashtbl.length not_requested) in
       List.iter (List.init num_to_request ~f:Fn.id) ~f:( fun _ ->
           let (index, _ ) = Hashtbl.choose_exn not_requested in
@@ -420,11 +432,11 @@ let run b worker_info_list =
     (* if all workers now have no work, return the accumulated results. Otherwise,
     repeat
     *)
-    if (Hashtbl.count have_work ~f:Fn.id) = 0 then
+    if (Hashtbl.count have_work__requested_work ~f:(fun (have_work, _) -> have_work)) = 0 then
       return updated_results
     else
       (
-      let%bind _ = Clock.after (Time.Span.of_ns 1.0) in
+      let%bind _ = Clock.after (Time.Span.of_ns 10.0) in
       run_inner updated_results)
   in
   run_inner []
@@ -450,10 +462,8 @@ let main filename =
                     in
                     let%bind _ = (
                     match dec with
-                    | Clause (_, _) -> print_endline "adding to db";
-                      add_dec_to_db dec workers_info
+                    | Clause (_, _) -> add_dec_to_db dec workers_info
                     | Query b -> (
-                        print_endline "got query";
                         print_endline s;
                         (* find all uniq VarExps in query *)
                         let orig_vars = uniq (find_vars b) in
