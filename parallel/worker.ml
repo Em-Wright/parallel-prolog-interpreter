@@ -303,8 +303,6 @@ let init_workers n : Worker_info.t list Deferred.t =
             ~redirect_stdout:(`File_append "/Users/em/Documents/diss_stdout.log")
             ~redirect_stderr:(`File_append "/Users/em/Documents/diss_stderr.log")
             []
-            (* TODO - should I initialise workers just before starting a query
-               execution, then I can pass the whole db, or do I do it like this? *)
           in
           let%bind conn = Connection.client_exn worker () in
           let%bind reader =
@@ -369,7 +367,7 @@ let run b worker_info_list =
       )
   in
   let give_work index job =
-    print_endline ("giving work to worker "^(Int.to_string index));
+    (* print_endline ("giving work to worker "^(Int.to_string index)); *)
     don't_wait_for
       (
         Connection.run_exn
@@ -380,12 +378,27 @@ let run b worker_info_list =
     update_have_work index true
   in
   let request_work index =
-    print_endline ("requesting work from worker "^(Int.to_string index));
+    (* print_endline ("requesting work from worker "^(Int.to_string index)); *)
     Pipe.write_without_pushback  (List.nth_exn worker_info_list index).writer ();
     update_requested_work index true
   in
   give_work 0 {goals = b; env = []};
   request_work 0;
+  (* TODO - we're somehow getting into a state where we have more jobs than workers,
+     which shouldn't be the case in the current setup. Not sure how that is occuring. Potentially
+     I can just ignore this, since I'll be changing how we distribute jobs anyway. Would still probably
+     be a good idea to figure out why it's occuring tho - could cause other problems later.
+     It's probably something to do with how we're updating the have_work__requested_work data structure.
+  *)
+  (* TODO - add a list of jobs as an argument to this run_inner function, to store extra jobs if
+     we end up with any from requesting more work than there are idle workers.
+     We'll need to add an integer to the requested_work portion of have_work__requested_work, to
+     count the number of loops since we made the request. Will need to figure out some sort of
+     system to indicate which workers have timed out requests, but we've already made another
+     request to replace that one. We can't just zero the request, since then we might request work
+     from it again. We also want the timeouts to be cascading, so if the replacement worker we ask for
+     work also times out, then we make another request of a different worker.
+  *)
   let rec run_inner results =
     let (updated_results, new_jobs) =
       List.foldi ~init:(results, []) worker_info_list ~f:(fun index (acc_res, acc_jobs) {conn=_; reader; writer=_} ->
@@ -394,17 +407,18 @@ let run b worker_info_list =
           | `Eof -> print_endline ("Pipe closed unexpectedly in worker "^ (Int.to_string index));
             (acc_res, acc_jobs)
           | `Ok (Job job) ->
-            print_endline ("got job from worker " ^ (Int.to_string index));
+            (* print_endline ("got job from worker " ^ (Int.to_string index)); *)
             update_requested_work index false;
             (acc_res, job::acc_jobs)
           | `Ok (Results results) ->
-            print_endline ("got results from worker " ^ (Int.to_string index));
+            (* print_endline ("got results from worker " ^ (Int.to_string index)); *)
             Hashtbl.set have_work__requested_work ~key:index ~data:(false, false);
             (results@acc_res, acc_jobs)
         )
     in
     (* give new_jobs to any idle workers and update have_work accordingly *)
     let idle = Hashtbl.filter have_work__requested_work ~f:(fun (b, _) -> not b) in
+    let num_requested = Hashtbl.count have_work__requested_work ~f:(fun (_, b) -> b) in
     if Hashtbl.length idle < List.length new_jobs then
       print_endline "More jobs than idle workers. This state should not occur";
     List.iter new_jobs ~f:(fun job ->
@@ -418,11 +432,10 @@ let run b worker_info_list =
     (* if, after handing out jobs, the number of idle workers > the number of workers we've requested_work_from
        and there are still workers which have work but we have not requested work from, request work from these
        workers *)
-    let num_requested = Hashtbl.count have_work__requested_work ~f:(fun (_, b) -> b) in
     if (num_requested < Hashtbl.length idle) then (
       let not_requested = Hashtbl.filter have_work__requested_work
           ~f:(fun (have_work, requested_work) -> have_work && (not requested_work) ) in
-      let num_to_request = Int.min (Hashtbl.length idle) (Hashtbl.length not_requested) in
+      let num_to_request = Int.min (Hashtbl.length idle - num_requested) (Hashtbl.length not_requested) in
       List.iter (List.init num_to_request ~f:Fn.id) ~f:( fun _ ->
           let (index, _ ) = Hashtbl.choose_exn not_requested in
           Hashtbl.remove not_requested index;
@@ -442,8 +455,8 @@ let run b worker_info_list =
   run_inner []
 ;;
 
-let main filename =
-  let%bind workers_info = init_workers 4 in
+let main filename num_workers =
+  let%bind workers_info = init_workers num_workers in
    (
     let%bind () = (
           let rec loop file_lines =
@@ -518,7 +531,12 @@ let command =
           ~doc:"FILE to read prolog from"
           "file"
           (required string)
+      and num_workers =
+        flag
+          ~doc:"INT number of parallel workers"
+          "num-workers"
+          (required int)
       in
-      fun () -> main filename
+      fun () -> main filename num_workers
     ]
 
