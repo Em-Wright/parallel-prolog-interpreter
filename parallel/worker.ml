@@ -45,7 +45,7 @@ module T = struct
     type t = unit
   end
 
-  let eval_inner gs env db  =
+  let eval gs env db  =
     match gs with
     | g1::gl -> (
         (* we have at least one more subgoal (g1) to prove in this job *)
@@ -188,11 +188,6 @@ module T = struct
                 | Some job -> ignore (Pipe.read_now worker_state.reader);
                   Pipe.write worker_state.writer (Job job)
               ) else Deferred.unit
-              (* we don't have any work to
-                 give the main process. We don't send a request
-                 for more work here, since we'll be sending one later
-                 anyway, so it would be redundant
-              *)
             )
       in
       match Deque.dequeue_back worker_state.q with
@@ -200,7 +195,7 @@ module T = struct
       | Some {goals =[]; env} -> main_inner (env::results)
       | Some {goals; env} -> (
           List.iter
-            ( eval_inner goals env worker_state.db)
+            ( eval goals env worker_state.db)
             ~f:( fun (goals, env) -> Deque.enqueue_back worker_state.q {goals; env} );
           main_inner results
         )
@@ -348,7 +343,7 @@ let add_dec_to_db dec workers_info =
     | Query _ -> return ()
 ;;
 
-let run b worker_info_list =
+let eval_query b worker_info_list =
   let num_workers = List.length worker_info_list in
   let have_work__requested_work = Hashtbl.of_alist_exn (module Int)
       (List.init num_workers ~f:(fun i -> (i, (false, false)))) in
@@ -384,13 +379,7 @@ let run b worker_info_list =
   in
   give_work 0 {goals = b; env = []};
   request_work 0;
-  (* TODO - we're somehow getting into a state where we have more jobs than workers,
-     which shouldn't be the case in the current setup. Not sure how that is occuring. Potentially
-     I can just ignore this, since I'll be changing how we distribute jobs anyway. Would still probably
-     be a good idea to figure out why it's occuring tho - could cause other problems later.
-     It's probably something to do with how we're updating the have_work__requested_work data structure.
-  *)
-  (* TODO - add a list of jobs as an argument to this run_inner function, to store extra jobs if
+  (* TODO - add a list of jobs as an argument to this eval_inner function, to store extra jobs if
      we end up with any from requesting more work than there are idle workers.
      We'll need to add an integer to the requested_work portion of have_work__requested_work, to
      count the number of loops since we made the request. Will need to figure out some sort of
@@ -399,7 +388,7 @@ let run b worker_info_list =
      from it again. We also want the timeouts to be cascading, so if the replacement worker we ask for
      work also times out, then we make another request of a different worker.
   *)
-  let rec run_inner results =
+  let rec eval_inner results =
     let (updated_results, new_jobs) =
       List.foldi ~init:(results, []) worker_info_list ~f:(fun index (acc_res, acc_jobs) {conn=_; reader; writer=_} ->
           match Pipe.read_now reader with
@@ -449,10 +438,11 @@ let run b worker_info_list =
       return updated_results
     else
       (
-      let%bind _ = Clock.after (Time.Span.of_ns 10.0) in
-      run_inner updated_results)
+        let%bind _ = Clock.after (Time.Span.of_ns 10.0) in
+        eval_inner updated_results
+      )
   in
-  run_inner []
+  eval_inner []
 ;;
 
 let main filename num_workers =
@@ -483,7 +473,7 @@ let main filename num_workers =
                         (* find num of VarExps in query *)
                         let orig_vars_num = List.length orig_vars in
                         (* evaluate query *)
-                        let%bind res = run b workers_info in
+                        let%bind res = eval_query b workers_info in
                         (* print the result *)
                         print_string "\n";
                         print_endline (string_of_res (res) orig_vars orig_vars_num);
