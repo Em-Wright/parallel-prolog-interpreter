@@ -48,3 +48,9 @@ _build/
 
 # bisect_ppx output
 *.out
+
+# used for testing
+*.sh
+timings.txt
+*.pl
+

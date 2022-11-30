@@ -1,7 +1,6 @@
 open! Core
 open! Async
 
-(* let backend = (module Backend : Rpc_parallel.Backend) *)
 let backend_and_settings = Rpc_parallel_edit.Backend_and_settings.T ((module Backend), ())
 
 let start_app

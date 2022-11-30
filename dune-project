@@ -7,20 +7,18 @@
 (generate_opam_files true)
 
 (source
- (github adamjstewart/prolog))
+ (github Em-Wright/parallel-prolog-interpreter))
 
 (authors "Adam J. Stewart")
 
-(maintainers "Adam J. Stewart")
-
 (license LICENSE)
 
-(documentation https://url/to/documentation)
+(documentation https://github.com/Em-Wright/parallel-prolog-interpreter/blob/worker-parallel/README.md)
 
 (package
  (name prolog_interpreter)
- (synopsis "A prolog interpreter in OCaml")
- (description "A longer description")
+ (synopsis "A parallel prolog interpreter in OCaml")
+ (description "A parallel (and sequential) Prolog interpreter written using the OCaml rpc_parallel library. ")
  (depends async ocaml dune core menhir ounit2 rpc_parallel)
  (tags
   ("prolog interpreter" prolog ocaml)))

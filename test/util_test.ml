@@ -46,14 +46,14 @@ let util_test_suite =
               ([VarExp "X"; IntExp 10; TermExp("blah",[VarExp "X"; VarExp "Y"])])
            )
         ), "[VarExp \"X\"; VarExp \"X\"; VarExp \"Y\"]";
-        
+
         (* Finding unique members (in this case variables) in a list *)
         (string_of_exp_list
            (uniq
               ([VarExp "X"; VarExp "X"; VarExp "Y"])
            )
         ), "[VarExp \"Y\"; VarExp \"X\"]";
-        
+
         (* Lifting a goal with a substituion *)
         (string_of_exp
            (sub_lift_goal
@@ -61,14 +61,14 @@ let util_test_suite =
               (VarExp "X")
            )
         ), "VarExp \"1\"";
-        
+
         (string_of_exp
            (sub_lift_goal
               ([(VarExp "X", VarExp "1")])
               (VarExp "Y")
            )
         ), "VarExp \"Y\"";
-        
+
         (string_of_exp
            (sub_lift_goal
               ([(VarExp "X", IntExp 7)])
@@ -76,14 +76,14 @@ let util_test_suite =
            )
         ), "Arithmetic (PLUS, ArithmeticInt 7, ArithmeticInt 1)"
         ;
-        
+
         (string_of_exp
                 (sub_lift_goal
                    ([(VarExp "X", VarExp "1")])
                    (IntExp 10)
                 )
         ), "IntExp 10";
-        
+
         (* Lifting goals with a substitution *)
         (string_of_exp_list
            (sub_lift_goals
@@ -93,41 +93,41 @@ let util_test_suite =
            )
         ), "[VarExp \"1\"; IntExp 10; TermExp (\"blah\", [VarExp \"1\"; VarExp \"Y\"; IntExp 1]); \
             Arithmetic (PLUS, ArithmeticVar \"1\", ArithmeticInt 2)]";
-        
+
         (string_of_exp_list
            (sub_lift_goals
               ([])
               ([VarExp("X"); IntExp 10; TermExp("blah", [VarExp "X"; VarExp "Y"; IntExp 1])])
            )
         ), "[VarExp \"X\"; IntExp 10; TermExp (\"blah\", [VarExp \"X\"; VarExp \"Y\"; IntExp 1])]";
-        
+
         (string_of_exp_list
            (sub_lift_goals
               ([(VarExp "X", VarExp "1"); (VarExp "Z", VarExp "blu")])
               ([VarExp("X"); IntExp 10; TermExp("blah", [VarExp "X"; VarExp "Y"; IntExp 1])])
            )
         ), "[VarExp \"1\"; IntExp 10; TermExp (\"blah\", [VarExp \"1\"; VarExp \"Y\"; IntExp 1])]";
-        
+
         (* Renaming variables in a declaration*)
         (string_of_dec
            (rename_vars_in_dec
               (Clause(TermExp("age",[TermExp("zaid",[]);IntExp 10 ]), [(IntExp 1)]))
            )
         ), "Clause (TermExp (\"age\", [TermExp (\"zaid\", []); IntExp 10]), [IntExp 1])";
-        
+
         (turn_to_unit (reset());
          string_of_dec
            (rename_vars_in_dec
               (Clause (TermExp ("sibling", [VarExp "X"; VarExp "Y"]), [TermExp ("parent_child", [VarExp "Z"; VarExp "X"]); TermExp ("parent_child", [VarExp "Z"; VarExp "Y"])]))
            )
         ), "Clause (TermExp (\"sibling\", [VarExp \"3\"; VarExp \"2\"]), [TermExp (\"parent_child\", [VarExp \"1\"; VarExp \"3\"]); TermExp (\"parent_child\", [VarExp \"1\"; VarExp \"2\"])])";
-        
+
         (string_of_dec
            (rename_vars_in_dec
               (Query ([TermExp ("age", [TermExp ("zaid", [])])]))
            )
         ), "Query ([TermExp (\"age\", [TermExp (\"zaid\", [])])])";
-        
+
         (turn_to_unit (reset());
          string_of_dec
                 (rename_vars_in_dec
@@ -135,7 +135,7 @@ let util_test_suite =
                             ArithmeticExp(PLUS, ArithmeticVar "X", ArithmeticVar "Z")]))
                 )
         ), "Query ([TermExp (\"parent\", [VarExp \"3\"; VarExp \"2\"]); TermExp (\"male\", [VarExp \"3\"]); Arithmetic (PLUS, ArithmeticVar \"3\", ArithmeticVar \"1\")])";
-        
+
         (* Pairandcat function for handling decompose case of unification *)
         (* TODO - do I need to add cases for arithmetic expressions in here? *)
         (string_of_subs
@@ -145,7 +145,7 @@ let util_test_suite =
               ([])
            )
         ), "[(TermExp (\"sally\", []), VarExp \"Y\"); (TermExp (\"trude\", []), VarExp \"X\")]";
-        
+
         (string_of_subs
            (pairandcat
               ([])
@@ -153,7 +153,7 @@ let util_test_suite =
               ([(VarExp "Z", IntExp 10)])
            )
         ), "[(VarExp \"Z\", IntExp 10)]";
-        
+
         (string_of_subs
            (pairandcat
               ([TermExp ("trude", []); TermExp ("sally", [])])
@@ -161,7 +161,7 @@ let util_test_suite =
               ([(VarExp "Z", IntExp 10)])
            )
         ), "[(TermExp (\"sally\", []), VarExp \"Y\"); (TermExp (\"trude\", []), VarExp \"X\"); (VarExp \"Z\", IntExp 10)]";
-        
+
         (try
            string_of_subs
              (pairandcat
@@ -171,7 +171,7 @@ let util_test_suite =
              )
          with Failure s -> s
         ), "sargs and targs should be the same length";
-        
+
         (try
            string_of_subs
              (pairandcat
@@ -181,7 +181,7 @@ let util_test_suite =
              )
          with Failure s -> s
         ), "sargs and targs should be the same length";
-        
+
         (* replace function for the elimination case of unification *)
         (* TODO - do I need to add cases for arithmetic expressions in here? *)
         (string_of_subs
@@ -463,7 +463,7 @@ let util_test_suite =
                         []
                     )
                 )
-            ), "[Query ([TermExp (\"parent\", [VarExp \"X\"; TermExp (\"charles1\", [])]); TermExp (\"male\", [VarExp \"X\"])])]";
+            ), "[]" ;
 
 
     ]

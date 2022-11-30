@@ -45,6 +45,18 @@ module T = struct
     type t = unit
   end
 
+  (* eval takes
+     - a list of goals to prove (exp list)
+     - the environment to prove them in ((exp * exp) list)
+     - the database of rules to use to prove them (dec list)
+     and returns the remainder of work to be done before this job is complete.
+     This is in the form of a list of jobs, each containing a list of goals
+     to prove, and an updated environment to prove them in. ((exp list) * ((exp * exp) list)) list.
+
+     The function itself performs one step of evaluation on the job it is given, and
+     either manages to prove it, returning the empty list, or generates one or more other
+     jobs to be done.
+  *)
   let eval gs env db  =
     match gs with
     | g1::gl -> (
@@ -166,6 +178,13 @@ module T = struct
     | [] -> []
   ;;
 
+  (* main takes the worker state and returns unit
+     It loops, checking for and then handling updates from the toplevel, before
+     taking a job from the stack and calling `eval' on it.
+     It sends results or work back to the toplevel via the `writer' pipe in
+     the worker_state.
+     It returns when it no longer has any work on its stack.
+  *)
   let main (worker_state : Worker_state.t) =
     (* Clear the pipe of any previous requests for work which
     are no longer relevant *)
@@ -284,10 +303,11 @@ module Worker_info = struct
   } [@@deriving fields]
 end
 
-(* TODO - need to extend the heartbeater timeout time - this is done in the
-   start_app function call.
+(* init_workers takes an int and returns a list of Worker_info.t
+   It initialises the given number of workers, gets the connection to each of them which
+   can be used to run RPCs, and sets up pipes to and from each of them, before
+   returning each of the connections, pipe readers and pipe writers.
 *)
-
 let init_workers n : Worker_info.t list Deferred.t =
     Deferred.List.init n
       ~how:`Parallel
@@ -313,7 +333,10 @@ let init_workers n : Worker_info.t list Deferred.t =
         )
   ;;
 
-
+(* add_dec_to_db takes a declaration (dec) and list of Worker_info.t and sends
+   the declaration to each of the workers to be added to their databases.
+   It returns unit.
+*)
 let add_dec_to_db dec workers_info =
     match dec with
     | Clause (h, _) -> (
@@ -343,6 +366,11 @@ let add_dec_to_db dec workers_info =
     | Query _ -> return ()
 ;;
 
+(* eval_query takes the body of a query (b) and a list of Worker_info.t
+   It handles giving work to the workers and aggregating the results they give back.
+   It loops until none of the workers have any work left, at which point it returns the
+   aggregated results.
+*)
 let eval_query b worker_info_list =
   let num_workers = List.length worker_info_list in
   let have_work__requested_work = Hashtbl.of_alist_exn (module Int)
@@ -445,6 +473,11 @@ let eval_query b worker_info_list =
   eval_inner []
 ;;
 
+(* main takes the name of a file and the number of parallel workers to use, and prints
+   the results of any queries in the file.
+   It loops, reading in each line of the file, and evaluating queries as it encounters
+   them.
+*)
 let main filename num_workers =
   let%bind workers_info = init_workers num_workers in
    (

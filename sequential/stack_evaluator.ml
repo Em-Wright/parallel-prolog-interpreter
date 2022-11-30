@@ -16,13 +16,6 @@ open Util
          - otherwise, each element is a list of substitutions for one solution
            to the query with the given db
 *)
-(* We'll be using the deque like a stack for now (i.e. taking from and adding to
-   the back) and will only take from the front later, when we write a
-   parallel version
-*)
-(* TODO - would it make sense to have the recursive part as an inner function,
-then we don't need to pass the db every time? *)
-(* TODO - might make sense to switch to iteration rather than recursion? *)
 let rec eval_inner q db results =
   match Deque.dequeue_back q with
   | None ->  results    (* no more of the tree to search so finished *)

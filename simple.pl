@@ -6,3 +6,6 @@ dog(jack).
 animal(X) :- cat(X).
 animal(X) :- dog(X).
 ?- animal(X).
+?- nonsense(Y).
+?- nonsense(nonsense).
+?- true.

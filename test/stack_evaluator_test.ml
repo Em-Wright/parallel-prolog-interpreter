@@ -35,7 +35,6 @@ let stack_evaluator_test_suite =
         ), "1";
         (* Evaluating results of a query with a given db *)
 
-        (* TODO - reformat these so they're in the right format for the stack evaluator *)
         (string_of_res
            ( eval_query
                 []
@@ -44,7 +43,7 @@ let stack_evaluator_test_suite =
            []
            0
         ), "true\n";
-        
+
         (string_of_res
            ( eval_query
                 [TermExp ("true", [])]
@@ -71,7 +70,7 @@ let stack_evaluator_test_suite =
                 []
                 0
         ), "false\n";
-        
+
         (string_of_res
            ( eval_query
                         [TermExp ("male", [TermExp ("elizabeth", [])])]

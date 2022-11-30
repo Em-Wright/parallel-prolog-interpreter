@@ -25,20 +25,13 @@ $ opam install menhir
 
 To build this project, simply clone the repository and run `dune build`:
 
-Afterwards, the interpreter can be run like so:
+Afterwards, the interpreter can be run using one of the following:
 
 ```
-$ ./bin/main.byte
+$ ./bin/sequential.exe sequential -file myprologfile
+$ ./bin/sequential.exe stack -file myprologfile
+$ ./bin/parallel.exe -file myprologfile -num-workers 8
 
-Welcome to the Prolog Interpreter
-
-> cat(tom).
-> animal(X) :- cat(X).
-> ?- animal(X).
-====================
-X = tom
-====================
-true
 ```
 
 ## Testing

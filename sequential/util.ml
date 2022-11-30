@@ -2,10 +2,7 @@ open Core
 open Ast
 open Common
 
-
-
 exception FAILED_SUBSTITUTION of string
-
 
 (*
    fresh:
@@ -348,35 +345,5 @@ let add_dec_to_db (dec, db) =
           print_string "Can't reassign 'greater_than' predicate\n"; db
         | _ -> dec :: db
     )
-    | Query _ -> (
-        dec :: db (* TODO - why are we adding a query to the database???
-                     surely we should just be returning the existing db?? 
-                  *)
-    )
+    | Query _ -> db
 
-(* (\* *)
-(*    eval_dec: *)
-(*      * takes in (all in a tuple): *)
-(*          dec - a dec type *)
-(*          db - a list of dec types *)
-(*      * evaluated the dec with the given db *)
-(*        returns the original db in the case *)
-(*        dec is a Query type *)
-(*        otherwise returns db prepended with dec *)
-(* *\) *)
-(* let eval_dec (dec, db) = *)
-(*     match dec with *)
-(*     | Clause (_, _) -> add_dec_to_db (dec, db) *)
-(*     | Query b -> ( *)
-(*         (\* find all uniq VarExps in query *\) *)
-(*         let orig_vars = uniq (find_vars b) in *)
-(*         (\* find num of VarExps in query *\) *)
-(*         let orig_vars_num = List.length orig_vars in *)
-(*         (\* evaluate query *\) *)
-(*         let res = eval_query (b, db, []) in *)
-(*         (\* print the result *\) *)
-(*         print_string (string_of_res (res) orig_vars orig_vars_num); *)
-(*         (\* reset fresh variable counter *\) *)
-(*         reset (); *)
-(*         db *)
-(*     ) *)
