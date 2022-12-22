@@ -52,7 +52,6 @@ let main filename ~eval_function =
       match file_lines with
       | s::ss -> (
           try (
-            print_endline s;
             let lexbuf = Lexing.from_string s in
             let newdb = handle_input db lexbuf ~eval_function in
             loop newdb ss

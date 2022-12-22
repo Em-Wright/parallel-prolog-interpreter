@@ -195,7 +195,7 @@ let command =
     [%map_open.Command
        let filename =
          flag
-           ~doc:"FILE optional file to read prolog from"
+           ~doc:"FILE to read prolog from"
            "file"
            (required string)
        in
