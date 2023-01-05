@@ -21,45 +21,41 @@ module Var = struct
     | Some x -> f !x
 end
 
-module Arithmetic_operator = struct
-  type t = PLUS | MINUS | MULT | DIV [@@deriving sexp]
-
-  let to_string t =
-    match t with
-    | PLUS -> " + "
-    | MINUS -> " - "
-    | MULT -> " * "
-    | DIV -> " / "
-end
+let operator_to_string (t : Ast.arithmetic_operator) =
+  match t with
+  | PLUS -> " + "
+  | MINUS -> " - "
+  | MULT -> " * "
+  | DIV -> " / "
 
 module Arithmetic_operand = struct
   type 'a t =
-    | ArithmeticVar of 'a Var.t
+    | ArithmeticVar of 'a Var.t ref
     | ArithmeticInt of int
 
   let to_string t (f : 'a -> string) =
     match t with
-    | ArithmeticVar v -> Var.to_string v f
+    | ArithmeticVar v -> Var.to_string !v f
     | ArithmeticInt i -> Int.to_string i
 end
 
 module Exp = struct
     type t =
-      | VarExp of t Var.t
+      | VarExp of t Var.t ref
       | IntExp of int
       | TermExp of string * t ref list
-      | ArithmeticExp of Arithmetic_operator.t * t Arithmetic_operand.t * t Arithmetic_operand.t
+      | ArithmeticExp of Ast.arithmetic_operator * t Arithmetic_operand.t * t Arithmetic_operand.t
 
     let rec to_string t =
       match t with
-      | VarExp v -> Var.to_string v to_string
+      | VarExp v -> Var.to_string !v to_string
       | IntExp i -> Int.to_string i
       | TermExp (name, args) ->
         let arg_string = List.fold args ~init:"" ~f:(fun acc arg -> acc ^ (to_string !arg) ^ ", ") in
         name ^ "(" ^ arg_string ^ ")"
       | ArithmeticExp (operator, op1, op2 ) ->
         (Arithmetic_operand.to_string op1 to_string)
-        ^ (Arithmetic_operator.to_string operator)
+        ^ (operator_to_string operator)
         ^ (Arithmetic_operand.to_string op2 to_string)
 
 end
@@ -98,9 +94,9 @@ end
     we should never need to reset it, and therefore don't need to properly copy it, or add it to
     the trail stack *)
 let rec copy (t_ref : Exp.t ref ) trail : Exp.t ref = match !t_ref with
-  | VarExp v -> (if not (Var.has_instance v) then
-                   (Trail.push trail v; Var.set_instance v (ref (Exp.VarExp (Var.create ()))));
-                 Var.get_instance v |> Option.value_exn )
+  | VarExp v -> (if not (Var.has_instance !v) then
+                   (Trail.push trail v; Var.set_instance !v (ref (Exp.VarExp (ref (Var.create ())))));
+                 Var.get_instance !v |> Option.value_exn )
   | TermExp (name, args) ->
     let args2 = List.map args ~f:(fun arg -> copy arg trail) in
     Exp.TermExp (name, args2) |> ref
@@ -108,12 +104,12 @@ let rec copy (t_ref : Exp.t ref ) trail : Exp.t ref = match !t_ref with
   | ArithmeticExp (operator, op1, op2) -> Exp.ArithmeticExp (operator, op1, op2) |> ref
 
 
-let rec unify (t1_ref : Exp.t ref) (t2_ref : Exp.t ref) trail =
+let rec unify (t1_ref : Exp.t ref) (t2_ref : Exp.t ref) (trail : Trail.t) =
   match (!t1_ref) with
   | VarExp v -> (* TODO occurs check *)
     (
-      match Var.get_instance v with
-      | None -> Trail.push trail (ref v); Var.set_instance v t2_ref; true
+      match Var.get_instance !v with
+      | None -> Trail.push trail v; Var.set_instance !v t2_ref; true
       | Some e -> unify e t2_ref trail
     )
   | TermExp (sname, sargs) ->
@@ -140,27 +136,27 @@ let rec unify (t1_ref : Exp.t ref) (t2_ref : Exp.t ref) trail =
 module Clause = struct
   type t = Exp.t ref * Exp.t ref list
 
-  let copy (head, body) trail_ref : t =
-    let head2 = copy head trail_ref in
-    let body2 = List.map body ~f:(fun elt -> copy elt trail_ref) in
+  let copy (head, body) trail : t =
+    let head2 = copy head trail in
+    let body2 = List.map body ~f:(fun elt -> copy elt trail) in
     (head2, body2)
 end
 
 let print_solution var_mapping =
   Hashtbl.iteri var_mapping
     ~f:(fun ~key ~data ->
-        let line = key ^ " = " ^ (Exp.to_string !data) in
+        let line = key ^ " = " ^ (Var.to_string data Exp.to_string) in
         print_endline line
       )
 
-let perform_arithmetic (op : Arithmetic_operator.t) i1 i2 =
+let perform_arithmetic (op : Ast.arithmetic_operator) i1 i2 =
   match op with
   | PLUS -> i1 + i2
   | MINUS -> i1 - i2
   | MULT -> i1 * i2
   | DIV -> i1 / i2
 
-let rec eval_query q db trail var_mapping =
+let rec eval_query q db (trail : Trail.t) var_mapping =
   match q with
   | [] -> print_solution var_mapping
   | g1::gl ->
@@ -233,12 +229,12 @@ let rec eval_query q db trail var_mapping =
             | _ -> ()
           )
         | TermExp(_,_) -> (
-            let db_copy = List.map db ~f:(fun clause -> Clause.copy clause (ref trail)) in
+            let db_copy = List.map db ~f:(fun clause -> Clause.copy clause trail) in
             let rec loop db_copy =
               match db_copy with
               | [] -> eval_query q db trail var_mapping
               | c::dbs -> (let t = Trail.mark trail in
-                           let (head, body) = Clause.copy c (ref trail) in
+                           let (head, body) = Clause.copy c trail in
                            Trail.undo trail t;
                            if unify head g1 trail then (
                              eval_query (body@gl) db trail var_mapping;
@@ -251,32 +247,33 @@ let rec eval_query q db trail var_mapping =
         | _ -> eval_query gl db trail var_mapping
       )
 
-let arithmetic_convert (t : Exp.t Arithmetic_operand.t) var_mapping =
+let arithmetic_convert (t : Ast.arithmetic_operand) (var_mapping : Exp.t Var.t String.Table.t) : Exp.t Arithmetic_operand.t =
   match t with
   | ArithmeticVar v -> (
       match Hashtbl.find var_mapping v with
-      | Some v2 -> v2
-      | None -> let new_var : Exp.t Var.t = VarExp (Var.create ()) in
+      | Some v2 -> ArithmeticVar (ref v2)
+      | None -> let new_var : Exp.t Var.t = Var.create () in
         Hashtbl.add_exn var_mapping ~key:v ~data:new_var;
-        new_var
+        ArithmeticVar (ref new_var)
     )
   | ArithmeticInt i -> ArithmeticInt i
 
-let convert (t : Ast.exp) var_mapping : Exp.t =
+let rec convert (t : Ast.exp) var_mapping : Exp.t =
   match t with
   | VarExp v -> (
       match Hashtbl.find var_mapping v with
-      | Some v2 -> v2
-      | None -> let new_var : Exp.t Var.t = VarExp (Var.create ()) in
+      | Some v2 -> VarExp (ref v2)
+      | None -> let new_var = Var.create () in
         Hashtbl.add_exn var_mapping ~key:v ~data:new_var;
-        new_var
+        VarExp (ref new_var)
     )
   | IntExp i -> IntExp i
   | TermExp (name, args) ->
-    let new_args = List.iter args ~f:(fun arg -> convert arg var_mapping |> ref) in
-    TermExp (name, args)
+    let new_args = List.map args ~f:(fun arg -> convert arg var_mapping |> ref) in
+    TermExp (name, new_args)
   | ArithmeticExp (op, op1, op2) ->
-    let new_op1 = 
+    let new_op1 = arithmetic_convert op1 var_mapping in let new_op2 = arithmetic_convert op2 var_mapping in
+    ArithmeticExp (op, new_op1, new_op2)
 
 
 let command =
@@ -293,11 +290,19 @@ let command =
         Interface.main filename
           ~eval_function:(fun db b ->
               (* convert the db and b into the required formats then feed to the eval function *)
-              (* let db_converted = List.map db *)
-              (*     ~f:(fun dec -> match dec with *)
-              (*         | Clause (h, b) ->  *)
-              (*       ) *)
+              let var_mapping = String.Table.create () in
+              let db_converted : Clause.t list = List.map db
+                  ~f:(fun dec -> match dec with
+                      | Clause (h, b) -> let h2 = convert h var_mapping in
+                        let b2 = List.map b ~f:(fun e -> convert e var_mapping |> ref) in
+                        (ref h2, b2)
+                      | Query _ -> Error.raise (Error.of_string "There should be no queries in the database")
+                    )
+              in
+              let b_converted : Exp.t ref list = List.map b ~f:(fun e -> convert e var_mapping |> ref ) in
+              print_endline "converted";
               let trail = Stack.create () in
-              eval_query db b trail
+              eval_query b_converted db_converted trail var_mapping;
+              []
             )
     ]
