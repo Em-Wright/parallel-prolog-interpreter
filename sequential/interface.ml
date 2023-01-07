@@ -11,6 +11,7 @@ let eval_dec ~db ~dec s ~eval_function : dec list = (
   match dec with
   | Clause (_, _) -> add_dec_to_db (dec, db)
   | Query b -> (
+      print_endline "\n\n";
       print_endline s;
       (* find all uniq VarExps in query *)
       let orig_vars = uniq (find_vars b) in

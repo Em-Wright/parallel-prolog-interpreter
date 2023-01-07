@@ -141,6 +141,12 @@ let rec unify (t1_ref : Exp.t ref) (t2_ref : Exp.t ref) (trail : Trail.t) =
         else false
       | _ -> false
     )
+  | IntExp i -> (
+      match !t2_ref with
+      | IntExp j -> i = j
+      | VarExp _ -> unify t2_ref t1_ref trail
+      | _ -> false
+    )
   | _ -> (
       match !t2_ref with
       | VarExp _ -> unify t2_ref t1_ref trail
@@ -173,7 +179,7 @@ let perform_arithmetic (op : Ast.arithmetic_operator) i1 i2 =
   | MULT -> i1 * i2
   | DIV -> i1 / i2
 
-let resolve (a : Exp.t Arithmetic_operand.t) =
+let resolve_arith (a : Exp.t Arithmetic_operand.t) =
   match a with
   | ArithmeticInt _ -> a
   | ArithmeticVar v ->
@@ -188,6 +194,16 @@ let resolve (a : Exp.t Arithmetic_operand.t) =
       | None -> a
     in
     resolve_inner (Var.get_instance !v)
+
+let rec resolve (e : Exp.t) =
+  match e with
+  | IntExp _ -> e
+  | VarExp v -> (match Var.get_instance !v with
+      | None -> e
+      | Some v -> resolve !v
+    )
+  | _ -> e
+
 
 let rec eval_query q db (trail : Trail.t) var_mapping =
   match q with
@@ -217,14 +233,14 @@ let rec eval_query q db (trail : Trail.t) var_mapping =
             Trail.undo trail t
           )
         | TermExp("greater_than", [lhs; rhs]) -> (
-          match !lhs, !rhs with
+          match (resolve !lhs), (resolve !rhs) with
           | IntExp i1, IntExp i2 ->
             if i1 > i2 then
               eval_query gl db trail var_mapping
           | _ -> () (* arguments insufficiently instantiated *)
         )
         | TermExp("less_than", [lhs; rhs]) -> (
-            match !lhs, !rhs with
+            match (resolve !lhs), (resolve !rhs) with
             | IntExp i1, IntExp i2 ->
               if i1 < i2 then
                 eval_query gl db trail var_mapping
@@ -235,7 +251,7 @@ let rec eval_query q db (trail : Trail.t) var_mapping =
                possible to unify them with any additional substitutions *)
             match !rhs with
             | ArithmeticExp (op, t1, t2) -> (
-                match (resolve t1), (resolve t2) with
+                match (resolve_arith t1), (resolve_arith t2) with
                 | ArithmeticInt i1, ArithmeticInt i2 -> (
                     let result = perform_arithmetic op i1 i2 in
                     let t = Trail.mark trail in
@@ -270,7 +286,7 @@ let rec eval_query q db (trail : Trail.t) var_mapping =
                            let (head, body) = Clause.copy c trail in
                            Trail.undo trail t;
                            if unify head g1 trail then (
-                             eval_query (body@gl) db trail var_mapping;
+                             eval_query (body@gl) db trail var_mapping
                            );
                            Trail.undo trail t;
                            loop dbs
