@@ -1,4 +1,5 @@
 open Core
+
 open Util
 
 
@@ -8,6 +9,7 @@ module Var = struct
 
   let create () = {name = fresh (); instance = None}
 
+  let name t = t.name
   let reset t = t.instance <- None
   let set_instance t p = t.instance <- Some p
 
@@ -17,7 +19,7 @@ module Var = struct
 
   let to_string {name; instance} (f : 'a -> string) =
     match instance with
-    | None -> name
+    | None -> "Var" ^ name
     | Some x -> f !x
 end
 
@@ -90,6 +92,18 @@ module Trail = struct
 end
 
 
+let copy_arithmetic (a : Exp.t Arithmetic_operand.t) trail : Exp.t Arithmetic_operand.t =
+  match a with
+  | ArithmeticInt i -> ArithmeticInt i
+  | ArithmeticVar v -> (
+      if not (Var.has_instance !v) then
+        (Trail.push trail v; Var.set_instance !v (ref (Exp.VarExp (ref (Var.create ())))));
+      match !(Var.get_instance !v |> Option.value_exn) with
+      | IntExp i -> ArithmeticInt i
+      | VarExp v -> ArithmeticVar v
+      | _ -> a
+    )
+
 (* NOTE we don't unify an ArithmeticVar with anything at any point (except on the rhs), so
     we should never need to reset it, and therefore don't need to properly copy it, or add it to
     the trail stack *)
@@ -98,10 +112,11 @@ let rec copy (t_ref : Exp.t ref ) trail : Exp.t ref = match !t_ref with
                    (Trail.push trail v; Var.set_instance !v (ref (Exp.VarExp (ref (Var.create ())))));
                  Var.get_instance !v |> Option.value_exn )
   | TermExp (name, args) ->
+    (* need to retain link to original variable? *)
     let args2 = List.map args ~f:(fun arg -> copy arg trail) in
     Exp.TermExp (name, args2) |> ref
   | IntExp i -> Exp.IntExp i |> ref
-  | ArithmeticExp (operator, op1, op2) -> Exp.ArithmeticExp (operator, op1, op2) |> ref
+  | ArithmeticExp (operator, op1, op2) -> Exp.ArithmeticExp (operator, (copy_arithmetic op1 trail), (copy_arithmetic op2 trail)) |> ref
 
 
 let rec unify (t1_ref : Exp.t ref) (t2_ref : Exp.t ref) (trail : Trail.t) =
@@ -143,11 +158,13 @@ module Clause = struct
 end
 
 let print_solution var_mapping =
+  print_endline "============";
   Hashtbl.iteri var_mapping
     ~f:(fun ~key ~data ->
         let line = key ^ " = " ^ (Var.to_string data Exp.to_string) in
         print_endline line
-      )
+      );
+    print_endline "============"
 
 let perform_arithmetic (op : Ast.arithmetic_operator) i1 i2 =
   match op with
@@ -155,6 +172,22 @@ let perform_arithmetic (op : Ast.arithmetic_operator) i1 i2 =
   | MINUS -> i1 - i2
   | MULT -> i1 * i2
   | DIV -> i1 / i2
+
+let resolve (a : Exp.t Arithmetic_operand.t) =
+  match a with
+  | ArithmeticInt _ -> a
+  | ArithmeticVar v ->
+    let rec resolve_inner (instance : Exp.t ref option) : Exp.t Arithmetic_operand.t =
+      match instance with
+      | Some e -> ( match !e with
+          | IntExp i -> ArithmeticInt i
+          | VarExp v -> resolve_inner (Var.get_instance !v)
+          | TermExp _ -> a
+          | ArithmeticExp _ -> a
+        )
+      | None -> a
+    in
+    resolve_inner (Var.get_instance !v)
 
 let rec eval_query q db (trail : Trail.t) var_mapping =
   match q with
@@ -202,7 +235,7 @@ let rec eval_query q db (trail : Trail.t) var_mapping =
                possible to unify them with any additional substitutions *)
             match !rhs with
             | ArithmeticExp (op, t1, t2) -> (
-                match t1, t2 with
+                match (resolve t1), (resolve t2) with
                 | ArithmeticInt i1, ArithmeticInt i2 -> (
                     let result = perform_arithmetic op i1 i2 in
                     let t = Trail.mark trail in
@@ -232,7 +265,7 @@ let rec eval_query q db (trail : Trail.t) var_mapping =
             let db_copy = List.map db ~f:(fun clause -> Clause.copy clause trail) in
             let rec loop db_copy =
               match db_copy with
-              | [] -> eval_query q db trail var_mapping
+              | [] -> ()
               | c::dbs -> (let t = Trail.mark trail in
                            let (head, body) = Clause.copy c trail in
                            Trail.undo trail t;
@@ -299,8 +332,8 @@ let command =
                       | Query _ -> Error.raise (Error.of_string "There should be no queries in the database")
                     )
               in
+              let var_mapping = String.Table.create () in
               let b_converted : Exp.t ref list = List.map b ~f:(fun e -> convert e var_mapping |> ref ) in
-              print_endline "converted";
               let trail = Stack.create () in
               eval_query b_converted db_converted trail var_mapping;
               []

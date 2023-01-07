@@ -7,10 +7,11 @@ open Util
 either returns an updated database, if the declaration is a clause, or calls
 the evaluation function on the query if the declaration is a query
 *)
-let eval_dec ~db ~dec ~eval_function : dec list = (
+let eval_dec ~db ~dec s ~eval_function : dec list = (
   match dec with
   | Clause (_, _) -> add_dec_to_db (dec, db)
   | Query b -> (
+      print_endline s;
       (* find all uniq VarExps in query *)
       let orig_vars = uniq (find_vars b) in
       (* find num of VarExps in query *)
@@ -29,7 +30,7 @@ let eval_dec ~db ~dec ~eval_function : dec list = (
 (* handle_input lexex and parses the input from the file (in lexbuf)
    then calls eval_dec, which decides what to do with this line of input.
 *)
-let handle_input db lexbuf ~eval_function : dec list = (
+let handle_input db lexbuf s ~eval_function : dec list = (
   let dec = clause (
       fun lb -> (
           match Lexer.token lb with
@@ -38,7 +39,7 @@ let handle_input db lexbuf ~eval_function : dec list = (
 		    )
 	  ) lexbuf
   in
-  eval_dec ~db ~dec ~eval_function
+  eval_dec ~db ~dec s ~eval_function
  )
 ;;
 
@@ -53,7 +54,7 @@ let main filename ~eval_function =
       | s::ss -> (
           try (
             let lexbuf = Lexing.from_string s in
-            let newdb = handle_input db lexbuf ~eval_function in
+            let newdb = handle_input db lexbuf s ~eval_function in
             loop newdb ss
           ) with
           | Failure f -> ( (* in case of an error *)
