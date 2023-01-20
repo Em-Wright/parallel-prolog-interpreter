@@ -239,10 +239,24 @@ let rec eval_query q db (trail : Trail.t) var_mapping =
               eval_query gl db trail var_mapping
           | _ -> () (* arguments insufficiently instantiated *)
         )
+        | TermExp("greater_than_or_eq", [lhs; rhs]) -> (
+            match (resolve !lhs), (resolve !rhs) with
+            | IntExp i1, IntExp i2 ->
+              if i1 >= i2 then
+                eval_query gl db trail var_mapping
+            | _ -> () (* arguments insufficiently instantiated *)
+          )
         | TermExp("less_than", [lhs; rhs]) -> (
             match (resolve !lhs), (resolve !rhs) with
             | IntExp i1, IntExp i2 ->
               if i1 < i2 then
+                eval_query gl db trail var_mapping
+            | _ -> () (* arguments insufficiently instantiated *)
+          )
+        | TermExp("less_than_or_eq", [lhs; rhs]) -> (
+            match (resolve !lhs), (resolve !rhs) with
+            | IntExp i1, IntExp i2 ->
+              if i1 <= i2 then
                 eval_query gl db trail var_mapping
             | _ -> () (* arguments insufficiently instantiated *)
           )

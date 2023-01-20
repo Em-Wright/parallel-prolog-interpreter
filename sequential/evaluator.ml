@@ -72,6 +72,15 @@ let rec eval_query (q, db, env) =
               []
           | _ -> [] (* arguments insufficiently instantiated *)
         )
+        | TermExp("greater_than_or_eq", [lhs; rhs]) -> (
+            match lhs, rhs with
+            | IntExp i1, IntExp i2 ->
+              if i1 >= i2 then
+                eval_query (gl, db, env)
+              else
+                []
+            | _ -> [] (* arguments insufficiently instantiated *)
+          )
         | TermExp("less_than", [lhs; rhs]) -> (
           match lhs, rhs with
           | IntExp i1, IntExp i2 ->
@@ -81,6 +90,15 @@ let rec eval_query (q, db, env) =
               []
           | _ -> [] (* arguments insufficiently instantiated *)
         )
+        | TermExp("less_than_or_eq", [lhs; rhs]) -> (
+            match lhs, rhs with
+            | IntExp i1, IntExp i2 ->
+              if i1 <= i2 then
+                eval_query (gl, db, env)
+              else
+                []
+            | _ -> [] (* arguments insufficiently instantiated *)
+          )
         | TermExp("is", [lhs; rhs]) -> (
           (* evaluate the arithmetic expressions with current substitutions, then check if it is
              possible to unify them with any additional substitutions *)
@@ -128,8 +146,8 @@ let rec eval_query (q, db, env) =
         (* if goal is some other predicate *)
         | TermExp(_,_) -> (
         (* iterate over the db *)
-        List.fold_right ~f:(
-            fun rule r -> (
+        List.fold_left ~f:(
+            fun r rule -> (
                 match (rename_vars_in_dec rule) with (* rename vars in rule to completely fresh ones *)
                 | Clause (h, b) -> (
                     (* check if this rule can be used for this subgoal *)
@@ -201,5 +219,6 @@ let command =
            (required string)
        in
        fun () ->
-         Interface.main filename ~eval_function:(fun db b -> eval_query (b, db, []) )
+         Interface.main filename ~eval_function:(fun db b ->
+             eval_query (b, db, []) )
     ]

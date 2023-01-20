@@ -7,7 +7,8 @@ open Include
 module Job = struct
   type t = {
     goals : exp list;
-    env : ((exp * exp) list)
+    env : ((exp * exp) list);
+    path : int list
   } [@@deriving bin_io, fields]
 end
 
@@ -16,7 +17,10 @@ module Dec = struct
 end
 
 module Results = struct
-  type t = (exp * exp) list list [@@deriving bin_io]
+  type t = ((exp * exp) list * int list )list [@@deriving bin_io]
+
+  let reverse_path_order t : t =
+    List.map t ~f:( fun (env, path) -> (env, List.rev path))
 end
 
 module Worker_to_toplevel = struct
@@ -57,17 +61,17 @@ module T = struct
      either manages to prove it, returning the empty list, or generates one or more other
      jobs to be done.
   *)
-  let eval gs env db  =
+  let eval gs env db path =
     match gs with
     | g1::gl -> (
         (* we have at least one more subgoal (g1) to prove in this job *)
         match g1 with
-        | TermExp("true", []) -> [ (gl, env)]
+        | TermExp("true", []) -> [ (gl, env, path)]
         | TermExp("equals", [lhs; rhs]) -> (
             match unify [(lhs, rhs)] with
             | Some s -> (
                 match unify (s@env) with
-                | Some env2 -> [(sub_lift_goals s gl, env2)]
+                | Some env2 -> [(sub_lift_goals s gl, env2, path)]
                 | None -> []
               )
             | None -> []
@@ -77,103 +81,119 @@ module T = struct
             | Some s -> (
                 match unify (s@env) with
                 | Some _ -> []
-                | None -> [(gl, env)]
+                | None -> [(gl, env, path)]
               )
-            | None -> [ (gl, env) ]
+            | None -> [ (gl, env, path) ]
           )
         | TermExp("greater_than", [lhs; rhs]) -> (
             match lhs, rhs with
-            | IntExp i1, IntExp i2 -> if i1 > i2 then [(gl, env)] else []
+            | IntExp i1, IntExp i2 -> if i1 > i2 then [(gl, env, path)] else []
             | _ -> [] (* arguments insufficiently instantiated *)
           )
         | TermExp("less_than", [lhs; rhs]) ->
           (
             match lhs, rhs with
-            | IntExp i1, IntExp i2 -> if i1 < i2 then [(gl, env)] else []
+            | IntExp i1, IntExp i2 -> if i1 < i2 then [(gl, env, path)] else []
             | _ -> [] (* arguments insufficiently instantiated *)
           )
-          | TermExp("is", [lhs; rhs]) -> (
-              (* evaluate the arithmetic expressions with current substitutions, then check if it is
+        | TermExp("greater_than_or_eq", [lhs; rhs]) -> (
+            match lhs, rhs with
+            | IntExp i1, IntExp i2 -> if i1 >= i2 then [(gl, env, path)] else []
+            | _ -> [] (* arguments insufficiently instantiated *)
+          )
+        | TermExp("less_than_or_eq", [lhs; rhs]) ->
+          (
+            match lhs, rhs with
+            | IntExp i1, IntExp i2 -> if i1 <= i2 then [(gl, env, path)] else []
+            | _ -> [] (* arguments insufficiently instantiated *)
+          )
+        | TermExp("is", [lhs; rhs]) -> (
+            (* evaluate the arithmetic expressions with current substitutions, then check if it is
                  possible to unify them with any additional substitutions *)
-              match rhs with
-              | ArithmeticExp (op, t1, t2) -> (
-                  match t1, t2 with
-                  | ArithmeticInt i1, ArithmeticInt i2 -> (
-                      let result = perform_arithmetic op i1 i2 in
-                      match lhs with
+            match rhs with
+            | ArithmeticExp (op, t1, t2) -> (
+                match t1, t2 with
+                | ArithmeticInt i1, ArithmeticInt i2 -> (
+                    let result = perform_arithmetic op i1 i2 in
+                    match lhs with
                       | VarExp _ -> (
                           match unify ((lhs, IntExp result)::env) with
                           | Some env2 ->
                             [ (
                               sub_lift_goals [(lhs, IntExp result)] gl,
-                              env2
+                              env2,
+                              path
                             )]
                           | None -> []
                         )
-                      | IntExp i -> if i = result then [(gl, env)] else []
+                      | IntExp i -> if i = result then [(gl, env, path)] else []
                       | _ -> []
                     )
                   | _ -> []
-                )
-              | IntExp result -> (
-                  match lhs with
-                  | VarExp _ ->
-                    ( match unify ((lhs, rhs)::env) with
-                      | Some env2 ->
-                         [(
-                          sub_lift_goals [(lhs, rhs)] gl,
-                          env2
-                        )]
-                      | None -> []
-                    )
-                  | IntExp i -> if i = result then [(gl, env)] else []
-                  | _ -> []
-                )
-              | _ -> []
-            )
-          (* if goal is some other predicate *)
-          | TermExp(_,_) -> (
-              List.fold db ~init:[]
-                ~f:(fun acc rule ->
-                    match (rename_vars_in_dec rule) with
-                    | Clause (h, body) -> (
-                        (* check if this rule can be used for this subgoal *)
-                        match unify [(g1, h)] with
-                        | Some s -> (
-                            match unify (s@env) with
-                            | Some env2 -> (
-                                if (List.length body = 1)
-                                then (
-                                  match body with
-                                  (* if the rule proved the subgoal (ie. rule was a
+              )
+            | IntExp result -> (
+                match lhs with
+                | VarExp _ ->
+                  ( match unify ((lhs, rhs)::env) with
+                    | Some env2 ->
+                      [(
+                        sub_lift_goals [(lhs, rhs)] gl,
+                        env2,
+                        path
+                      )]
+                    | None -> []
+                  )
+                | IntExp i -> if i = result then [(gl, env, path)] else []
+                | _ -> []
+              )
+            | _ -> []
+          )
+        (* if goal is some other predicate *)
+        | TermExp(_,_) -> (
+            List.foldi db ~init:[]
+              ~f:(fun i acc rule ->
+                  match (rename_vars_in_dec rule) with
+                  | Clause (h, body) -> (
+                      (* check if this rule can be used for this subgoal *)
+                      match unify [(g1, h)] with
+                      | Some s -> (
+                          match unify (s@env) with
+                          | Some env2 -> (
+                              if (List.length body = 1)
+                              then (
+                                match body with
+                                (* if the rule proved the subgoal (ie. rule was a
                                      fact) then recurse on remaining subgoals
-                                  *)
-                                  | ((TermExp ("true", _)) :: _) ->
-                                    (
-                                      sub_lift_goals s gl,
-                                      env2
-                                    )::acc
-                                  | _ ->
-                                    (
-                                      (sub_lift_goals s body) @ (sub_lift_goals s gl),
-                                      env2
-                                    )::acc
-                                )
-                                else
+                                *)
+                                | ((TermExp ("true", _)) :: _) ->
+                                  (
+                                    sub_lift_goals s gl,
+                                    env2,
+                                    i::path
+                                  )::acc
+                                | _ ->
                                   (
                                     (sub_lift_goals s body) @ (sub_lift_goals s gl),
-                                    env2
+                                    env2,
+                                    i::path
                                   )::acc
                               )
-                            | _ -> acc
-                          )
-                        (* this rule's head doesn't unify with the subgoal *)
-                        | _ -> acc
-                      )
-                    |  _ -> acc
-            ))
-          (* subgoal g1 isn't a TermExp *)
-          | _ -> [(gl, env)]
+                              else
+                                (
+                                  (sub_lift_goals s body) @ (sub_lift_goals s gl),
+                                  env2,
+                                  i::path
+                                )::acc
+                            )
+                          | _ -> acc
+                        )
+                      (* this rule's head doesn't unify with the subgoal *)
+                      | _ -> acc
+                    )
+                  |  _ -> acc
+                ))
+        (* subgoal g1 isn't a TermExp *)
+        | _ -> [(gl, env, path)]
       )
     | [] -> []
   ;;
@@ -189,7 +209,7 @@ module T = struct
     (* Clear the pipe of any previous requests for work which
     are no longer relevant *)
     Pipe.clear worker_state.reader;
-    let rec main_inner results =
+    let rec main_inner (results : ((exp * exp) list * int list) list) =
       let%bind _check_for_requests =
         (* NOTE - if you ever use a `read' function to check if there's
            anything in the pipe, make sure to use read_now - `read' waits
@@ -199,7 +219,7 @@ module T = struct
           | None -> Deferred.unit
           | Some () -> (
               (* We only give out work if we have at least 2 jobs on our stack.
-              Otherwise, we give away all our work, and have to ask the
+              Otherwise, we would give away all our work, and have to ask the
               toplevel for more *)
               if (Deque.length worker_state.q) > 1 then (
                 match Deque.dequeue_front worker_state.q with
@@ -210,12 +230,12 @@ module T = struct
             )
       in
       match Deque.dequeue_back worker_state.q with
-      | None -> Pipe.write worker_state.writer (Results results)
-      | Some {goals =[]; env} -> main_inner (env::results)
-      | Some {goals; env} -> (
+      | None -> Pipe.write worker_state.writer (Results (Results.reverse_path_order results))
+      | Some {goals =[]; env; path} -> main_inner ((env, path)::results)
+      | Some {goals; env; path} -> (
           List.iter
-            ( eval goals env worker_state.db)
-            ~f:( fun (goals, env) -> Deque.enqueue_back worker_state.q {goals; env} );
+            ( eval goals env worker_state.db path)
+            ~f:( fun (goals, env, path) -> Deque.enqueue_back worker_state.q {goals; env; path} );
           main_inner results
         )
     in
@@ -358,6 +378,10 @@ let add_dec_to_db dec workers_info =
           print_string "Can't reassign 'less_than' predicate\n"; Deferred.unit
         | TermExp ("greater_than", _) ->
           print_string "Can't reassign 'greater_than' predicate\n"; Deferred.unit
+        | TermExp ("less_than_or_eq", _) ->
+          print_string "Can't reassign 'less_than_or_eq' predicate\n"; Deferred.unit
+        | TermExp ("greater_than_or_eq", _) ->
+          print_string "Can't reassign 'greater_than_or_eq' predicate\n"; Deferred.unit
         | _ -> Deferred.List.iter ~how:`Parallel workers_info
                  ~f:(fun worker_info ->
                      Connection.run_exn (Worker_info.conn worker_info) ~f:(functions.update_db) ~arg:dec
@@ -390,7 +414,6 @@ let eval_query b worker_info_list =
       )
   in
   let give_work index job =
-    (* print_endline ("giving work to worker "^(Int.to_string index)); *)
     don't_wait_for
       (
         Connection.run_exn
@@ -401,21 +424,11 @@ let eval_query b worker_info_list =
     update_have_work index true
   in
   let request_work index =
-    (* print_endline ("requesting work from worker "^(Int.to_string index)); *)
     Pipe.write_without_pushback  (List.nth_exn worker_info_list index).writer ();
     update_requested_work index true
   in
-  give_work 0 {goals = b; env = []};
+  give_work 0 {goals = b; env = []; path = []};
   request_work 0;
-  (* TODO - add a list of jobs as an argument to this eval_inner function, to store extra jobs if
-     we end up with any from requesting more work than there are idle workers.
-     We'll need to add an integer to the requested_work portion of have_work__requested_work, to
-     count the number of loops since we made the request. Will need to figure out some sort of
-     system to indicate which workers have timed out requests, but we've already made another
-     request to replace that one. We can't just zero the request, since then we might request work
-     from it again. We also want the timeouts to be cascading, so if the replacement worker we ask for
-     work also times out, then we make another request of a different worker.
-  *)
   let rec eval_inner results =
     let (updated_results, new_jobs) =
       List.foldi ~init:(results, []) worker_info_list ~f:(fun index (acc_res, acc_jobs) {conn=_; reader; writer=_} ->
@@ -424,11 +437,9 @@ let eval_query b worker_info_list =
           | `Eof -> print_endline ("Pipe closed unexpectedly in worker "^ (Int.to_string index));
             (acc_res, acc_jobs)
           | `Ok (Job job) ->
-            (* print_endline ("got job from worker " ^ (Int.to_string index)); *)
             update_requested_work index false;
             (acc_res, job::acc_jobs)
           | `Ok (Results results) ->
-            (* print_endline ("got results from worker " ^ (Int.to_string index)); *)
             Hashtbl.set have_work__requested_work ~key:index ~data:(false, false);
             (results@acc_res, acc_jobs)
         )
@@ -507,9 +518,18 @@ let main filename num_workers =
                         let orig_vars_num = List.length orig_vars in
                         (* evaluate query *)
                         let%bind res = eval_query b workers_info in
+                        let sorted_res = List.sort res ~compare:(fun (_env1, path1) (_env2, path2) ->
+                            (* need to sort by path *)
+                            let a = List.compare Int.compare path1 path2 in
+                            if a = 0 then
+                            (List.length path1) - (List.length path2)
+                            else a
+                          )
+                        in
+                        let envs = List.map sorted_res ~f:(fun (env, _) -> env) in
                         (* print the result *)
                         print_string "\n";
-                        print_endline (string_of_res (res) orig_vars orig_vars_num);
+                        print_endline (string_of_res envs orig_vars orig_vars_num);
                         print_string "\n\n";
                         (* reset fresh variable counter *)
                         reset ();

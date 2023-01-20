@@ -55,6 +55,8 @@
 %token NOTEQUAL
 %token GT
 %token LT
+%token GEQ
+%token LEQ
 
 /* Meta-characters */
 %token EOF
@@ -88,9 +90,11 @@ structure:
     | a = ATOM; LPAREN; tl = term_list; RPAREN          { TermExp (a, tl) }
     | v = VAR; IS; a = arithmetic                       { TermExp ("is", [VarExp v; a]) }
     | t1 = comparable; EQUALS; t2 = comparable          { TermExp ("equals", [t1; t2]) }
-    | t1 = comparable; NOTEQUAL; t2 = comparable          { TermExp ("not_equal", [t1; t2]) }
+    | t1 = comparable; NOTEQUAL; t2 = comparable        { TermExp ("not_equal", [t1; t2]) }
     | t1 = comparable; GT; t2 = comparable              { TermExp ("greater_than", [t1; t2]) }
     | t1 = comparable; LT; t2 = comparable              { TermExp ("less_than", [t1; t2]) }
+    | t1 = comparable; GEQ; t2 = comparable             { TermExp ("greater_than_or_eq", [t1; t2]) }
+    | t1 = comparable; LEQ; t2 = comparable             { TermExp ("less_than_or_eq", [t1; t2]) }
 
 list:
     | LBRACKET; RBRACKET                                { TermExp ("empty_list", [])}

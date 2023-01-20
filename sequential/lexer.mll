@@ -85,6 +85,8 @@ rule token = parse
     | "!="              { NOTEQUAL  }
     | '>'               { GT        }
     | '<'               { LT        }
+    | ">="              { GEQ       }
+    | "<="              { LEQ       }
 
 and comments count = parse
     | open_comment      { comments (1 + count) lexbuf }

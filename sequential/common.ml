@@ -35,6 +35,8 @@ let string_of_token t =
     | NOTEQUAL -> "NOTEQUAL"
     | GT       -> "GT"
     | LT       -> "LT"
+    | GEQ      -> "GEQ"
+    | LEQ      -> "LEQ"
     | RBRACKET -> "RBRACKET"
     | LBRACKET -> "LBRACKET"
     | PIPE     -> "PIPE"

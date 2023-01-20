@@ -18,7 +18,7 @@ let eval_dec ~db ~dec s ~eval_function : dec list = (
       (* find num of VarExps in query *)
       let orig_vars_num = List.length orig_vars in
       (* evaluate query *)
-      let res = eval_function db b in
+      let res = eval_function (List.rev db) b in
       (* print the result *)
       print_string (string_of_res (res) orig_vars orig_vars_num);
       (* reset fresh variable counter *)

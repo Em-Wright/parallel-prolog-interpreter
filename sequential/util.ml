@@ -343,6 +343,10 @@ let add_dec_to_db (dec, db) =
           print_string "Can't reassign 'less_than' predicate\n"; db
         | TermExp ("greater_than", _) ->
           print_string "Can't reassign 'greater_than' predicate\n"; db
+        | TermExp ("less_than_or_eq", _) ->
+          print_string "Can't reassign 'less_than_or_eq' predicate\n"; db
+        | TermExp ("greater_than_or_eq", _) ->
+          print_string "Can't reassign 'greater_than_or_eq' predicate\n"; db
         | _ -> dec :: db
     )
     | Query _ -> db

@@ -48,10 +48,21 @@ let rec eval_inner q db results =
           | IntExp i1, IntExp i2 -> if i1 > i2 then Deque.enqueue_back q (gl, env)
           | _ -> () (* arguments insufficiently instantiated *)
         )
+      | TermExp("greater_than_or_eq", [lhs; rhs]) -> (
+          match lhs, rhs with
+          | IntExp i1, IntExp i2 -> if i1 >= i2 then Deque.enqueue_back q (gl, env)
+          | _ -> () (* arguments insufficiently instantiated *)
+        )
       | TermExp("less_than", [lhs; rhs]) ->
         (
           match lhs, rhs with
           | IntExp i1, IntExp i2 -> if i1 < i2 then Deque.enqueue_back q (gl, env)
+          | _ -> () (* arguments insufficiently instantiated *)
+        )
+      | TermExp("less_than_or_eq", [lhs; rhs]) ->
+        (
+          match lhs, rhs with
+          | IntExp i1, IntExp i2 -> if i1 <= i2 then Deque.enqueue_back q (gl, env)
           | _ -> () (* arguments insufficiently instantiated *)
         )
       | TermExp("is", [lhs; rhs]) -> (
