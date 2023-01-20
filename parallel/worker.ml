@@ -4,12 +4,43 @@ open Prolog_interpreter.Ast
 open Prolog_interpreter.Util
 open Include
 
+let (fresh, reset, update) =
+  let nxt = ref 0 in
+  let f () = (nxt := !nxt + 1; !nxt) in
+  let r () = nxt := 0 in
+  let u n = nxt := Int.max !nxt n in
+  (f, r, u)
+
+let rename_vars_in_dec d =
+  match d with
+  | Clause (h, b) ->
+    let head_vars = find_vars [h] in
+    let body_vars = find_vars b in
+    (* find uniq vars from both head and body *)
+    let vars : exp list = uniq (head_vars @ body_vars) in
+    (* get fresh variable mappings *)
+    let sub = List.map ~f:(fun x -> (x, VarExp (fresh() |> Int.to_string))) vars in
+    (* substitute new names for variables *)
+    Clause (sub_lift_goal sub h, sub_lift_goals sub b)
+  | Query (b) ->
+    (* find uniq vars in query *)
+    let body_vars = find_vars b in
+    (* get fresh variable mappings *)
+    let vars = uniq (body_vars) in
+    let sub = List.map ~f:(fun x -> (x, VarExp (fresh() |> Int.to_string))) vars in
+    (* substitute new names for variables *)
+    Query (sub_lift_goals sub b)
+
 module Job = struct
   type t = {
     goals : exp list;
     env : ((exp * exp) list);
     path : int list
   } [@@deriving bin_io, fields]
+end
+
+module Job_and_nxt = struct
+  type t = Job.t * int [@@deriving bin_io]
 end
 
 module Dec = struct
@@ -26,18 +57,19 @@ end
 module Worker_to_toplevel = struct
   type t =
     Results of Results.t
-    | Job of Job.t
+    | Job of Job_and_nxt.t
   [@@deriving bin_io]
 end
 
 module T = struct
 
   module Worker_state = struct
-    type init_arg = dec list
+    type init_arg = (dec list * int)
     [@@deriving bin_io]
 
     type t = {
       q : Job.t Deque.t;
+      index : int;
       mutable db : dec list;
       mutable reader : unit Pipe.Reader.t;
       mutable writer : Worker_to_toplevel.t Pipe.Writer.t
@@ -225,7 +257,7 @@ module T = struct
                 match Deque.dequeue_front worker_state.q with
                 | None -> Deferred.unit (* Should never happen *)
                 | Some job -> ignore (Pipe.read_now worker_state.reader);
-                  Pipe.write worker_state.writer (Job job)
+                  Pipe.write worker_state.writer (Job (job, fresh ()))
               ) else Deferred.unit
             )
       in
@@ -235,7 +267,8 @@ module T = struct
       | Some {goals; env; path} -> (
           List.iter
             ( eval goals env worker_state.db path)
-            ~f:( fun (goals, env, path) -> Deque.enqueue_back worker_state.q {goals; env; path} );
+            ~f:( fun (goals, env, path2) ->
+                Deque.enqueue_back worker_state.q {goals; env; path=path2} );
           main_inner results
         )
     in
@@ -243,13 +276,13 @@ module T = struct
   ;;
 
 
-  let initialise (init_arg : Worker_state.init_arg) : Worker_state.t  =
+  let initialise ((init_db, index) : Worker_state.init_arg) : Worker_state.t  =
     let q = Deque.create () in
     let (_, temp_writer) = Pipe.create () in
-    {q; db = init_arg; reader = Pipe.empty (); writer = temp_writer}
+    {q; index; db = init_db; reader = Pipe.empty (); writer = temp_writer}
 
   type 'worker functions = {
-    eval_query : ('worker, Job.t, unit) Rpc_parallel_edit.Function.t;
+    eval_query : ('worker, Job_and_nxt.t, unit) Rpc_parallel_edit.Function.t;
     update_db : ('worker, dec, unit) Rpc_parallel_edit.Function.t;
     worker_to_toplevel_pipe : ('worker, unit, Worker_to_toplevel.t Pipe.Reader.t) Rpc_parallel_edit.Function.t;
     toplevel_to_worker_pipe : ('worker, unit * unit Pipe.Reader.t, unit) Rpc_parallel_edit.Function.t
@@ -260,13 +293,14 @@ module T = struct
        with type worker_state := Worker_state.t
         and type connection_state := Connection_state.t) =
   struct
-    let eval_query_impl ~worker_state ~conn_state:() job =
+    let eval_query_impl ~worker_state ~conn_state:() (job, highest_var) =
+      update highest_var;
       Deque.enqueue_back (Worker_state.q worker_state) job;
       main worker_state
     ;;
 
     let update_db_impl ~worker_state ~conn_state:() d =
-      Worker_state.set_db worker_state (d::worker_state.db) |> return
+      Worker_state.set_db worker_state (worker_state.db@[d]) |> return
     ;;
 
     let worker_to_toplevel_pipe_impl ~worker_state ~conn_state:() _ =
@@ -280,7 +314,7 @@ module T = struct
     let eval_query =
       C.create_rpc
         ~f:eval_query_impl
-        ~bin_input:(Job.bin_t)
+        ~bin_input:(Job_and_nxt.bin_t)
         ~bin_output:(Unit.bin_t)
         ()
 
@@ -331,13 +365,13 @@ end
 let init_workers n : Worker_info.t list Deferred.t =
     Deferred.List.init n
       ~how:`Parallel
-      ~f:(fun _ ->
+      ~f:(fun i ->
           let%bind worker = spawn_exn
             ~on_failure:Error.raise
             ~shutdown_on:Heartbeater_connection_timeout
-            ~redirect_stdout:(`File_append "/Users/em/Documents/diss_stdout.log")
+            ~redirect_stdout:(`File_append "/Users/em/Documents/diss_stdout.txt")
             ~redirect_stderr:(`File_append "/Users/em/Documents/diss_stderr.log")
-            []
+            ([], i)
           in
           let%bind conn = Connection.client_exn worker () in
           let%bind reader =
@@ -390,6 +424,16 @@ let add_dec_to_db dec workers_info =
     | Query _ -> return ()
 ;;
 
+(* TODO -
+   Then track which
+   workers have which jobs, and what the most fine-grained job is which had the missing solution in it. Then figure out
+   where the solution got to.
+
+   Also print the state of have_work__requested_work after each message.
+
+   We don't even get as far as finishing the permutations :(
+*)
+
 (* eval_query takes the body of a query (b) and a list of Worker_info.t
    It handles giving work to the workers and aggregating the results they give back.
    It loops until none of the workers have any work left, at which point it returns the
@@ -427,7 +471,7 @@ let eval_query b worker_info_list =
     Pipe.write_without_pushback  (List.nth_exn worker_info_list index).writer ();
     update_requested_work index true
   in
-  give_work 0 {goals = b; env = []; path = []};
+  give_work 0 ({goals = b; env = []; path = []}, 0);
   request_work 0;
   let rec eval_inner results =
     let (updated_results, new_jobs) =
@@ -436,9 +480,10 @@ let eval_query b worker_info_list =
           | `Nothing_available -> (acc_res, acc_jobs)
           | `Eof -> print_endline ("Pipe closed unexpectedly in worker "^ (Int.to_string index));
             (acc_res, acc_jobs)
-          | `Ok (Job job) ->
-            update_requested_work index false;
-            (acc_res, job::acc_jobs)
+          | `Ok (Job job) -> (
+              update_requested_work index false;
+              (acc_res, (job)::acc_jobs)
+            )
           | `Ok (Results results) ->
             Hashtbl.set have_work__requested_work ~key:index ~data:(false, false);
             (results@acc_res, acc_jobs)

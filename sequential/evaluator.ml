@@ -146,8 +146,8 @@ let rec eval_query (q, db, env) =
         (* if goal is some other predicate *)
         | TermExp(_,_) -> (
         (* iterate over the db *)
-        List.fold_left ~f:(
-            fun r rule -> (
+        List.fold_right ~f:(
+            fun rule r -> (
                 match (rename_vars_in_dec rule) with (* rename vars in rule to completely fresh ones *)
                 | Clause (h, b) -> (
                     (* check if this rule can be used for this subgoal *)
@@ -219,6 +219,5 @@ let command =
            (required string)
        in
        fun () ->
-         Interface.main filename ~eval_function:(fun db b ->
-             eval_query (b, db, []) )
+         Interface.main filename ~eval_function:(fun db b -> eval_query (b, db, []) )
     ]
