@@ -23,7 +23,8 @@ let rec eval_query (q, db, env) =
         (* no more subgoals to prove so finished *)
         [env]
     )
-    | (g1 :: gl) -> (  (* have at least one more subgoal (g1) to prove *)
+    | (g1 :: gl) ->
+      (  (* have at least one more subgoal (g1) to prove *)
         match g1 with
         (* if goal is the true predicate *)
         | TermExp("true", []) -> (
