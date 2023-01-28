@@ -21,7 +21,7 @@ let rec eval_query (q, db, env) =
     match q with
     | [] -> (
         (* no more subgoals to prove so finished *)
-        [env]
+        ([env], false)
     )
     | (g1 :: gl) ->
       (  (* have at least one more subgoal (g1) to prove *)
@@ -32,8 +32,12 @@ let rec eval_query (q, db, env) =
               gl,
               db,
               env
-            )
+          )
         )
+        | TermExp("cut", []) -> (
+            let (res, _) = eval_query ( gl, db, env ) in
+            (res, true)
+          )
         (* if the goal is the 'equals' predicate *)
         | TermExp("equals", [lhs; rhs]) -> (
             (* check if the lhs and rhs can unify *)
@@ -46,9 +50,9 @@ let rec eval_query (q, db, env) =
                       db,
                       env2
                     ))
-                | None -> []
+                | None -> ([], false)
               )
-            | None -> []
+            | None -> ([], false)
           )
         | TermExp("not_equal", [lhs;rhs]) -> (
             (* check if the lhs and rhs can unify. If they can, this is not a
@@ -58,7 +62,7 @@ let rec eval_query (q, db, env) =
             match unify [(lhs, rhs)] with
             | Some s -> (
                 match unify (s@env) with
-                | Some _ -> []
+                | Some _ -> ([], false)
                 | None -> eval_query (gl, db, env)
               )
             | None -> eval_query (gl, db, env)
@@ -69,8 +73,8 @@ let rec eval_query (q, db, env) =
             if i1 > i2 then
               eval_query (gl, db, env)
             else
-              []
-          | _ -> [] (* arguments insufficiently instantiated *)
+              ([], false)
+          | _ ->  ([], false) (* arguments insufficiently instantiated *)
         )
         | TermExp("greater_than_or_eq", [lhs; rhs]) -> (
             match lhs, rhs with
@@ -78,8 +82,8 @@ let rec eval_query (q, db, env) =
               if i1 >= i2 then
                 eval_query (gl, db, env)
               else
-                []
-            | _ -> [] (* arguments insufficiently instantiated *)
+                ([], false)
+            | _ ->  ([], false) (* arguments insufficiently instantiated *)
           )
         | TermExp("less_than", [lhs; rhs]) -> (
           match lhs, rhs with
@@ -87,8 +91,8 @@ let rec eval_query (q, db, env) =
             if i1 < i2 then
               eval_query (gl, db, env)
             else
-              []
-          | _ -> [] (* arguments insufficiently instantiated *)
+              ([], false)
+          | _ ->  ([], false) (* arguments insufficiently instantiated *)
         )
         | TermExp("less_than_or_eq", [lhs; rhs]) -> (
             match lhs, rhs with
@@ -96,8 +100,8 @@ let rec eval_query (q, db, env) =
               if i1 <= i2 then
                 eval_query (gl, db, env)
               else
-                []
-            | _ -> [] (* arguments insufficiently instantiated *)
+                ([], false)
+            | _ ->  ([], false) (* arguments insufficiently instantiated *)
           )
         | TermExp("is", [lhs; rhs]) -> (
           (* evaluate the arithmetic expressions with current substitutions, then check if it is
@@ -116,13 +120,13 @@ let rec eval_query (q, db, env) =
                                   db,
                                   env2
                                 )
-                              | None -> []
+                              | None ->  ([], false)
                             )
                       | IntExp i ->
-                        if i = result then eval_query (gl, db, env) else []
-                      | _ -> []
+                        if i = result then eval_query (gl, db, env) else  ([], false)
+                      | _ ->  ([], false)
                     )
-                  | _ -> []
+                  | _ ->  ([], false)
               )
             | IntExp result -> (
                 match lhs with
@@ -134,20 +138,22 @@ let rec eval_query (q, db, env) =
                             db,
                             env2
                           )
-                        | None -> []
+                        | None ->  ([], false)
                       )
                 | IntExp i -> (
-                    if i = result then eval_query (gl, db, env) else []
+                    if i = result then eval_query (gl, db, env) else ([], false)
                   )
-                | _ -> []
+                | _ -> ([], false)
               )
-            | _ -> []
+            | _ -> ([], false)
             )
         (* if goal is some other predicate *)
         | TermExp(_,_) -> (
         (* iterate over the db *)
-        List.fold_right ~f:(
-            fun rule r -> (
+        let x = ref 0 in
+        List.fold_until ~finish:(fun x -> x) ~f:(
+            fun (r, _) rule -> (
+                x := !x + 1;
                 match (rename_vars_in_dec rule) with (* rename vars in rule to completely fresh ones *)
                 | Clause (h, b) -> (
                     (* check if this rule can be used for this subgoal *)
@@ -164,22 +170,33 @@ let rec eval_query (q, db, env) =
                                 (* if the rule proved the subgoal (ie. rule was a
                                    fact) then recurse on remaining subgoals *)
                                 | ((TermExp ("true", _)) :: _) ->
-                                    ((eval_query (
+                                  let (res, cut) =
+                                    (eval_query (
                                         sub_lift_goals s gl,
                                         db,
                                         env2
-                                     )) @ r)
+                                     ))
+                                  in
+                                  if cut then Stop (res @ r, false)
+                                  else Continue (res @ r, false)
                                 (* if rule wasn't a fact then we have more
                                    subgoals from the body of the rule
                                    to prove
                                    sub_lift_goals takes our substitution list, and a list of goals,
                                    and returns the goals with the substitution applied.
                                 *)
-                                | _ -> ((eval_query (
-                                    (sub_lift_goals s b) @ (sub_lift_goals s gl),
-                                    db,
-                                    env2
-                                )) @ r))
+                                | _ ->
+                                  (
+                                    let (res, cut) = (eval_query (
+                                        (sub_lift_goals s b) @ (sub_lift_goals s gl),
+                                        db,
+                                        env2
+                                      ))
+                                    in
+                                    if cut then Stop (res @ r, false)
+                                    else Continue (res @ r, false)
+                                  )
+                              )
                             else
                                 (* if rule wasn't a fact then we have more
                                    subgoals from the body of the rule
@@ -187,22 +204,27 @@ let rec eval_query (q, db, env) =
                                    we fold the result of evaluating the query with the other possible
                                    solutions in r
                                 *)
-                                ((eval_query (
+                              (
+                                let (res, cut) = (eval_query (
                                     (sub_lift_goals s b) @ (sub_lift_goals s gl),
                                     db,
                                     env2
-                                )) @ r)
-                        )
+                                  ))
+                                in
+                                if cut then Stop (res @ r, false)
+                                else Continue (res @ r, false)
+                              )
+                          )
                         (* the substitution from unify the rule head and subgoal
                            doesn't unify with the environment gathered so far *)
-                        | _ -> r
+                        | _ -> Continue (r, false)
                     )
                     (* this rule's head doesn't unify with the subgoal *)
-                    | _ -> r
+                    | _ -> Continue (r, false)
                 )
                 (* found a dec in the db that isn't a Clause *)
-                |  _ -> r
-          )) db ~init:[] )
+                |  _ -> Continue (r, false)
+          )) db ~init:([], false) )
         (* subgoal isn't a TermExp (i.e. is a VarExp or a ConstExp) *)
         | _ -> eval_query (gl, db, env)
     )
@@ -219,5 +241,6 @@ let command =
            (required string)
        in
        fun () ->
-         Interface.main filename ~eval_function:(fun db b -> eval_query (b, db, []) )
+         Interface.main filename ~eval_function:(fun db b ->
+             let (res,_) = eval_query (b, db, []) in res )
     ]

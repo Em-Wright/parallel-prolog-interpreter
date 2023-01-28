@@ -300,7 +300,8 @@ module T = struct
     ;;
 
     let update_db_impl ~worker_state ~conn_state:() d =
-      Worker_state.set_db worker_state (worker_state.db@[d]) |> return
+      (* Worker_state.set_db worker_state (worker_state.db@[d]) |> return *)
+      Worker_state.set_db worker_state (d::worker_state.db) |> return
     ;;
 
     let worker_to_toplevel_pipe_impl ~worker_state ~conn_state:() _ =
@@ -392,47 +393,25 @@ let init_workers n : Worker_info.t list Deferred.t =
    It returns unit.
 *)
 let add_dec_to_db dec workers_info =
-    match dec with
-    | Clause (h, _) -> (
-        match h with
-        (* don't allow user to add a new definition of true *)
-        | TermExp ("true", _) ->
-          print_string "Can't reassign true predicate\n"; Deferred.unit
-        | TermExp ("is", _) ->
-          print_string "Can't reassign 'is' predicate\n"; Deferred.unit
-        | TermExp ("list", _) ->
-          print_string "Can't reassign 'list' predicate\n"; Deferred.unit
-        | TermExp ("empty_list", _) ->
-          print_string "Can't reassign 'empty_list' predicate\n"; Deferred.unit
-        | TermExp ("equals", _) ->
-          print_string "Can't reassign 'equals' predicate\n"; Deferred.unit
-        | TermExp ("not_equal", _) ->
-          print_string "Can't reassign 'not_equal' predicate\n"; Deferred.unit
-        | TermExp ("less_than", _) ->
-          print_string "Can't reassign 'less_than' predicate\n"; Deferred.unit
-        | TermExp ("greater_than", _) ->
-          print_string "Can't reassign 'greater_than' predicate\n"; Deferred.unit
-        | TermExp ("less_than_or_eq", _) ->
-          print_string "Can't reassign 'less_than_or_eq' predicate\n"; Deferred.unit
-        | TermExp ("greater_than_or_eq", _) ->
-          print_string "Can't reassign 'greater_than_or_eq' predicate\n"; Deferred.unit
-        | _ -> Deferred.List.iter ~how:`Parallel workers_info
-                 ~f:(fun worker_info ->
-                     Connection.run_exn (Worker_info.conn worker_info) ~f:(functions.update_db) ~arg:dec
-                   )
-      )
-    | Query _ -> return ()
+  let disallowed = ["true"; "is"; "list"; "empty_list"; "equals"; "not_equal"; "less_than";
+                    "greater_than"; "less_than_or_eq"; "greater_than_or_eq"; "cut"]
+  in
+  match dec with
+  | Clause (h, _) -> (
+      match h with
+      | TermExp (name, _) -> if List.exists disallowed ~f:(fun a -> String.equal name a )
+        then ( print_string ("Can't reassign '"^name^"' predicate\n"); Deferred.unit)
+        else Deferred.List.iter ~how:`Parallel workers_info
+               ~f:(fun worker_info ->
+                   Connection.run_exn (Worker_info.conn worker_info) ~f:(functions.update_db) ~arg:dec
+                 )
+      | _ -> Deferred.List.iter ~how:`Parallel workers_info
+               ~f:(fun worker_info ->
+                   Connection.run_exn (Worker_info.conn worker_info) ~f:(functions.update_db) ~arg:dec
+                 )
+    )
+  | Query _ -> Deferred.unit
 ;;
-
-(* TODO -
-   Then track which
-   workers have which jobs, and what the most fine-grained job is which had the missing solution in it. Then figure out
-   where the solution got to.
-
-   Also print the state of have_work__requested_work after each message.
-
-   We don't even get as far as finishing the permutations :(
-*)
 
 (* eval_query takes the body of a query (b) and a list of Worker_info.t
    It handles giving work to the workers and aggregating the results they give back.
@@ -443,6 +422,8 @@ let eval_query b worker_info_list =
   let num_workers = List.length worker_info_list in
   let have_work__requested_work = Hashtbl.of_alist_exn (module Int)
       (List.init num_workers ~f:(fun i -> (i, (false, false)))) in
+
+  (* define helper functions *)
   let update_have_work index b =
     Hashtbl.update have_work__requested_work index ~f:(fun data_opt ->
         match data_opt with
@@ -471,8 +452,12 @@ let eval_query b worker_info_list =
     Pipe.write_without_pushback  (List.nth_exn worker_info_list index).writer ();
     update_requested_work index true
   in
+
+  (* start by giving work to the first worker *)
   give_work 0 ({goals = b; env = []; path = []}, 0);
-  request_work 0;
+  if num_workers > 1 then
+       request_work 0;
+
   let rec eval_inner results =
     let (updated_results, new_jobs) =
       List.foldi ~init:(results, []) worker_info_list ~f:(fun index (acc_res, acc_jobs) {conn=_; reader; writer=_} ->

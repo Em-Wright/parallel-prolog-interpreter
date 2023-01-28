@@ -57,6 +57,7 @@
 %token LT
 %token GEQ
 %token LEQ
+%token CUT
 
 /* Meta-characters */
 %token EOF
@@ -95,10 +96,11 @@ structure:
     | t1 = comparable; LT; t2 = comparable              { TermExp ("less_than", [t1; t2]) }
     | t1 = comparable; GEQ; t2 = comparable             { TermExp ("greater_than_or_eq", [t1; t2]) }
     | t1 = comparable; LEQ; t2 = comparable             { TermExp ("less_than_or_eq", [t1; t2]) }
+    | CUT                                               { TermExp ("cut", []) }
 
 list:
     | LBRACKET; RBRACKET                                { TermExp ("empty_list", [])}
-    | LBRACKET; l = list_body; RBRACKET                             { l }
+    | LBRACKET; l = list_body; RBRACKET                 { l }
 
 list_body:
     | t = term                                          { TermExp("list", [t; TermExp("empty_list", [])]) }

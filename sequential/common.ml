@@ -40,6 +40,7 @@ let string_of_token t =
     | RBRACKET -> "RBRACKET"
     | LBRACKET -> "LBRACKET"
     | PIPE     -> "PIPE"
+    | CUT      -> "CUT"
 
 let string_of_token_list tl =
     "[" ^ (String.concat "; " (List.map string_of_token tl)) ^ "]"
@@ -127,6 +128,7 @@ let rec readable_string_of_exp e =
       | TermExp ("list", [element; rest_of_list]) ->
         let rest_of_string = inner_string rest_of_list in
         (readable_string_of_exp element) ^ ", " ^ rest_of_string
+      | VarExp v -> "Var" ^ v
       | _ -> "This is not a list, but has been given to the readable_string_of_list function"
     in
     "[" ^ (inner_string list_exp) ^ "]"

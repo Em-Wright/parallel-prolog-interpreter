@@ -7,6 +7,8 @@ open Prolog_interpreter.Evaluator
 let identity_func s = s
 let turn_to_unit _ = ()
 
+let eval_query arg = let (res, _) = eval_query arg in res
+
 let evaluator_test_suite =
     "Sequential Evaluator" >::: (
         List.map (
@@ -195,7 +197,7 @@ let evaluator_test_suite =
                 )
                 [VarExp "Z"; VarExp "E"]
                 2
-            ), "====================\nE = zaid\nZ = 5\n====================\n====================\nE = adam\nZ = 10\n====================\ntrue\n";
+            ), "====================\nE = adam\nZ = 10\n====================\n====================\nE = zaid\nZ = 5\n====================\ntrue\n";
 
             (string_of_res
                 (eval_query
@@ -249,9 +251,6 @@ let evaluator_test_suite =
                [VarExp "X"]
                1
             ), "====================\nX = [1, 2]\n====================\ntrue\n";
-
-            (* TODO - add cases in here involving arithmetic. Also should write a set of tests
-               for the function perform_arithmetic, even though it's not too complex *)
 
             (string_of_res
                (eval_query
@@ -328,10 +327,10 @@ let evaluator_test_suite =
                [VarExp "Z"]
                1
             ), "====================\n\
-                Z = 7\n\
-                ====================\n\
-                ====================\n\
                 Z = 0\n\
+                ====================\n\
+                ====================\n\
+                Z = 7\n\
                 ====================\n\
                 true\n";
 
@@ -355,13 +354,13 @@ let evaluator_test_suite =
                [VarExp "Z"]
                1
             ), "====================\n\
-                Z = 4\n\
+                Z = 1\n\
                 ====================\n\
                 ====================\n\
                 Z = 3\n\
                 ====================\n\
                 ====================\n\
-                Z = 1\n\
+                Z = 4\n\
                 ====================\ntrue\n";
 
             (string_of_res
@@ -386,10 +385,10 @@ let evaluator_test_suite =
                [VarExp "Z"]
                1
             ), "====================\n\
-                Z = 3\n\
-                ====================\n\
-                ====================\n\
                 Z = -1\n\
+                ====================\n\
+                ====================\n\
+                Z = 3\n\
                 ====================\n\
                 true\n";
 
@@ -427,7 +426,33 @@ let evaluator_test_suite =
                 )
                 [VarExp "E"; VarExp "Z"]
                 2
-            ), "====================\nZ = sally\nE = sally\n====================\n====================\nZ = sally\nE = erica\n====================\n====================\nZ = erica\nE = sally\n====================\n====================\nZ = erica\nE = erica\n====================\n====================\nZ = tom\nE = tom\n====================\n====================\nZ = sally\nE = sally\n====================\ntrue\n";
+            ),
+            "====================
+Z = sally
+E = sally
+====================
+====================
+Z = tom
+E = tom
+====================
+====================
+Z = erica
+E = erica
+====================
+====================
+Z = erica
+E = sally
+====================
+====================
+Z = sally
+E = erica
+====================
+====================
+Z = sally
+E = sally
+====================
+true
+";
 
             (string_of_res
                 (eval_query
@@ -500,5 +525,27 @@ let evaluator_test_suite =
                 []
                 0
             ), "false\n";
+
+            (string_of_res
+               (eval_query
+                  (
+                    [TermExp("fib", [IntExp 5; VarExp "X"])],
+                    [
+                      Clause (TermExp("fib", [IntExp 0; IntExp 1]), [ TermExp ("cut", [])]);
+                      Clause (TermExp("fib", [IntExp 1; IntExp 1]), [ TermExp ("cut", [])]);
+                      Clause (TermExp("fib", [VarExp "N"; VarExp "M"]), [
+                          TermExp("is", [VarExp "N1"; ArithmeticExp(MINUS, ArithmeticVar "N", ArithmeticInt 1)]);
+                          TermExp("is", [VarExp "N2"; ArithmeticExp(MINUS, ArithmeticVar "N", ArithmeticInt 2)]);
+                          TermExp("fib", [VarExp "N1"; VarExp "K1"]);
+                          TermExp("fib", [VarExp "N2"; VarExp "K2"]);
+                          TermExp("is", [VarExp "M"; ArithmeticExp(PLUS, ArithmeticVar "K1", ArithmeticVar "K2")])
+                        ]);
+                    ],
+                    []
+                  )
+               )
+               []
+               0
+            ), "====================\nX = 8\n====================\ntrue\n";
         ]
     )

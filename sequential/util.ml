@@ -323,30 +323,15 @@ let string_of_res e orig_query_vars orig_vars_num =
        otherwise, db is returned
 *)
 let add_dec_to_db (dec, db) =
+    let disallowed = ["true"; "is"; "list"; "empty_list"; "equals"; "not_equal"; "less_than";
+                     "greater_than"; "less_than_or_eq"; "greater_than_or_eq"; "cut"]
+    in
     match dec with
     | Clause (h, _) -> (
         match h with
-        (* don't allow user to add a new definition of true *)
-        | TermExp ("true", _) ->
-            print_string "Can't reassign true predicate\n"; db
-        | TermExp ("is", _) ->
-          print_string "Can't reassign 'is' predicate\n"; db
-        | TermExp ("list", _) ->
-          print_string "Can't reassign 'list' predicate\n"; db
-        | TermExp ("empty_list", _) ->
-          print_string "Can't reassign 'empty_list' predicate\n"; db
-        | TermExp ("equals", _) ->
-          print_string "Can't reassign 'equals' predicate\n"; db
-        | TermExp ("not_equal", _) ->
-          print_string "Can't reassign 'not_equal' predicate\n"; db
-        | TermExp ("less_than", _) ->
-          print_string "Can't reassign 'less_than' predicate\n"; db
-        | TermExp ("greater_than", _) ->
-          print_string "Can't reassign 'greater_than' predicate\n"; db
-        | TermExp ("less_than_or_eq", _) ->
-          print_string "Can't reassign 'less_than_or_eq' predicate\n"; db
-        | TermExp ("greater_than_or_eq", _) ->
-          print_string "Can't reassign 'greater_than_or_eq' predicate\n"; db
+        | TermExp (name, _) -> if List.exists disallowed ~f:(fun a -> String.equal name a )
+            then ( print_string ("Can't reassign '"^name^"' predicate\n"); db)
+            else dec::db
         | _ -> dec :: db
     )
     | Query _ -> db
