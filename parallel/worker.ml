@@ -43,6 +43,10 @@ module Job_and_nxt = struct
   type t = Job.t * int [@@deriving bin_io]
 end
 
+module Job_and_bool = struct
+  type t = Job.t * int * bool [@@deriving bin_io]
+end
+
 module Dec = struct
   type t = dec [@@deriving bin_io]
 end
@@ -237,10 +241,34 @@ module T = struct
      the worker_state.
      It returns when it no longer has any work on its stack.
   *)
-  let main (worker_state : Worker_state.t) =
+  let main (worker_state : Worker_state.t) send_initial_jobs_bool =
     (* Clear the pipe of any previous requests for work which
     are no longer relevant *)
     Pipe.clear worker_state.reader;
+    let init_results = match Deque.dequeue_back worker_state.q with
+    | None -> []
+    | Some {goals =[]; env; path} -> [(env, path)]
+    | Some {goals; env; path} -> (
+        let jobs =
+          ( eval goals env worker_state.db path) in
+        List.iter jobs
+          ~f:( fun (goals, env, path2) ->
+              Deque.enqueue_back worker_state.q {goals; env; path=path2} );
+        []
+      )
+    in
+    let rec loop_send_jobs () =
+      if (Deque.length worker_state.q) > 1 then (
+          match Deque.dequeue_front worker_state.q with
+          | None -> Deferred.unit (* Should never happen *)
+          | Some job -> ignore (Pipe.read_now worker_state.reader);
+            let%bind _ = Pipe.write worker_state.writer (Job (job, fresh ())) in
+            loop_send_jobs ()
+        ) else Deferred.unit
+    in
+    let%bind _ =
+    if send_initial_jobs_bool then loop_send_jobs () else Deferred.unit
+        in
     let rec main_inner (results : ((exp * exp) list * int list) list) =
       let%bind _check_for_requests =
         (* NOTE - if you ever use a `read' function to check if there's
@@ -265,14 +293,15 @@ module T = struct
       | None -> Pipe.write worker_state.writer (Results (Results.reverse_path_order results))
       | Some {goals =[]; env; path} -> main_inner ((env, path)::results)
       | Some {goals; env; path} -> (
-          List.iter
-            ( eval goals env worker_state.db path)
+          let jobs =
+            ( eval goals env worker_state.db path) in
+          List.iter jobs
             ~f:( fun (goals, env, path2) ->
                 Deque.enqueue_back worker_state.q {goals; env; path=path2} );
           main_inner results
         )
     in
-    main_inner []
+    main_inner init_results
   ;;
 
 
@@ -282,7 +311,7 @@ module T = struct
     {q; index; db = init_db; reader = Pipe.empty (); writer = temp_writer}
 
   type 'worker functions = {
-    eval_query : ('worker, Job_and_nxt.t, unit) Rpc_parallel_edit.Function.t;
+    eval_query : ('worker, Job_and_bool.t, unit) Rpc_parallel_edit.Function.t;
     update_db : ('worker, dec, unit) Rpc_parallel_edit.Function.t;
     worker_to_toplevel_pipe : ('worker, unit, Worker_to_toplevel.t Pipe.Reader.t) Rpc_parallel_edit.Function.t;
     toplevel_to_worker_pipe : ('worker, unit * unit Pipe.Reader.t, unit) Rpc_parallel_edit.Function.t
@@ -293,14 +322,13 @@ module T = struct
        with type worker_state := Worker_state.t
         and type connection_state := Connection_state.t) =
   struct
-    let eval_query_impl ~worker_state ~conn_state:() (job, highest_var) =
+    let eval_query_impl ~worker_state ~conn_state:() (job, highest_var, send_initial_jobs_bool) =
       update highest_var;
       Deque.enqueue_back (Worker_state.q worker_state) job;
-      main worker_state
+      main worker_state send_initial_jobs_bool
     ;;
 
     let update_db_impl ~worker_state ~conn_state:() d =
-      (* Worker_state.set_db worker_state (worker_state.db@[d]) |> return *)
       Worker_state.set_db worker_state (d::worker_state.db) |> return
     ;;
 
@@ -315,7 +343,7 @@ module T = struct
     let eval_query =
       C.create_rpc
         ~f:eval_query_impl
-        ~bin_input:(Job_and_nxt.bin_t)
+        ~bin_input:(Job_and_bool.bin_t)
         ~bin_output:(Unit.bin_t)
         ()
 
@@ -370,7 +398,7 @@ let init_workers n : Worker_info.t list Deferred.t =
           let%bind worker = spawn_exn
             ~on_failure:Error.raise
             ~shutdown_on:Heartbeater_connection_timeout
-            ~redirect_stdout:(`File_append "/Users/em/Documents/diss_stdout.txt")
+            ~redirect_stdout:(`File_append ("/Users/em/Documents/diss_stdout"^(string_of_int i)^".txt"))
             ~redirect_stderr:(`File_append "/Users/em/Documents/diss_stderr.log")
             ([], i)
           in
@@ -438,13 +466,13 @@ let eval_query b worker_info_list =
         | None -> (true, b)
       )
   in
-  let give_work index job =
+  let give_work index (job, n, b) =
     don't_wait_for
       (
         Connection.run_exn
           (Worker_info.conn (List.nth_exn worker_info_list index))
           ~f:(functions.eval_query)
-          ~arg:job
+          ~arg:(job, n, b)
       );
     update_have_work index true
   in
@@ -453,65 +481,61 @@ let eval_query b worker_info_list =
     update_requested_work index true
   in
 
-  (* start by giving work to the first worker *)
-  give_work 0 ({goals = b; env = []; path = []}, 0);
+  let spare_jobs = Queue.create () in
+  let accumulated_results = ref [] in
+
+  (* start by giving work to the first worker, then requesting work if we have more than 1 worker *)
+  give_work 0 ({goals = b; env = []; path = []}, 0, true);
   if num_workers > 1 then
        request_work 0;
 
-  let rec eval_inner results =
-    let (updated_results, new_jobs) =
-      List.foldi ~init:(results, []) worker_info_list ~f:(fun index (acc_res, acc_jobs) {conn=_; reader; writer=_} ->
-          match Pipe.read_now reader with
-          | `Nothing_available -> (acc_res, acc_jobs)
-          | `Eof -> print_endline ("Pipe closed unexpectedly in worker "^ (Int.to_string index));
-            (acc_res, acc_jobs)
-          | `Ok (Job job) -> (
-              update_requested_work index false;
-              (acc_res, (job)::acc_jobs)
-            )
-          | `Ok (Results results) ->
-            Hashtbl.set have_work__requested_work ~key:index ~data:(false, false);
-            (results@acc_res, acc_jobs)
-        )
-    in
+  let rec eval_inner () =
+    List.iteri worker_info_list ~f:(fun index {conn=_; reader; writer=_} ->
+        match Pipe.read_now reader with
+        | `Nothing_available -> ()
+        | `Eof -> print_endline ("Pipe closed unexpectedly in worker "^ (Int.to_string index))
+        | `Ok (Job job) -> (
+            update_requested_work index false;
+            Queue.enqueue spare_jobs job
+          )
+        | `Ok (Results results) ->
+          Hashtbl.set have_work__requested_work ~key:index ~data:(false, false);
+          accumulated_results := (results@(!accumulated_results))
+      );
     (* give new_jobs to any idle workers and update have_work accordingly *)
     let idle = Hashtbl.filter have_work__requested_work ~f:(fun (b, _) -> not b) in
-    let num_requested = Hashtbl.count have_work__requested_work ~f:(fun (_, b) -> b) in
-    if Hashtbl.length idle < List.length new_jobs then
-      print_endline "More jobs than idle workers. This state should not occur";
-    List.iter new_jobs ~f:(fun job ->
-        (* find any idle worker, give it work, mark it as not idle *)
-        (* using choose_exn here, since we shouldn't have more jobs than idle workers, in
-        the current scheme *)
-        let (index, _ ) = Hashtbl.choose_exn idle in
-        Hashtbl.remove idle index;
-        give_work index job
-      );
-    (* if, after handing out jobs, the number of idle workers > the number of workers we've requested_work_from
-       and there are still workers which have work but we have not requested work from, request work from these
-       workers *)
-    if (num_requested < Hashtbl.length idle) then (
+    let work_given = Hashtbl.fold ~init:[] idle ~f:(fun ~key ~data:_ acc ->
+        match Queue.dequeue spare_jobs with
+        | None -> acc
+        | Some (job, n) ->
+          give_work key (job, n, false);
+          key::acc
+      )
+    in
+    List.iter work_given ~f:(fun index -> Hashtbl.remove idle index);
+
+    (* Make any more requests for work that are needed *)
+    if (Queue.length spare_jobs < num_workers) then (
       let not_requested = Hashtbl.filter have_work__requested_work
           ~f:(fun (have_work, requested_work) -> have_work && (not requested_work) ) in
-      let num_to_request = Int.min (Hashtbl.length idle - num_requested) (Hashtbl.length not_requested) in
-      List.iter (List.init num_to_request ~f:Fn.id) ~f:( fun _ ->
-          let (index, _ ) = Hashtbl.choose_exn not_requested in
-          Hashtbl.remove not_requested index;
-          request_work index
-      )
+      Hashtbl.iteri not_requested ~f:(fun ~key ~data:_ ->
+          request_work key
+        )
     );
-    (* if all workers now have no work, return the accumulated results. Otherwise,
-    repeat
+
+    (* if there's now no work, return the accumulated results. Otherwise, repeat
     *)
-    if (Hashtbl.count have_work__requested_work ~f:(fun (have_work, _) -> have_work)) = 0 then
-      return updated_results
+    if (Hashtbl.count have_work__requested_work ~f:(fun (have_work, _) -> have_work)) = 0 &&
+       (Queue.length spare_jobs ) = 0
+    then
+      return accumulated_results
     else
       (
         let%bind _ = Clock.after (Time.Span.of_ns 10.0) in
-        eval_inner updated_results
+        eval_inner ()
       )
   in
-  eval_inner []
+  eval_inner ()
 ;;
 
 (* main takes the name of a file and the number of parallel workers to use, and prints
@@ -548,7 +572,7 @@ let main filename num_workers =
                         let orig_vars_num = List.length orig_vars in
                         (* evaluate query *)
                         let%bind res = eval_query b workers_info in
-                        let sorted_res = List.sort res ~compare:(fun (_env1, path1) (_env2, path2) ->
+                        let sorted_res = List.sort !res ~compare:(fun (_env1, path1) (_env2, path2) ->
                             (* need to sort by path *)
                             let a = List.compare Int.compare path1 path2 in
                             if a = 0 then
