@@ -21,6 +21,9 @@ module Var = struct
     match instance with
     | None -> "Var" ^ name
     | Some x -> f !x
+
+  let equal v1 v2 = String.equal v1.name v2.name
+
 end
 
 let operator_to_string (t : Ast.arithmetic_operator) =
@@ -118,13 +121,43 @@ let rec copy (t_ref : Exp.t ref ) trail : Exp.t ref = match !t_ref with
   | IntExp i -> Exp.IntExp i |> ref
   | ArithmeticExp (operator, op1, op2) -> Exp.ArithmeticExp (operator, (copy_arithmetic op1 trail), (copy_arithmetic op2 trail)) |> ref
 
+let rec get_furthest_instance (v : Exp.t Var.t ref) =
+  match !v.instance with
+  | None -> Exp.VarExp v
+  | Some e -> (
+      match !e with
+      | VarExp v2 -> get_furthest_instance v2
+      | owt_else -> owt_else
+    )
+
+let arithmetic_occurs t1_ref a =
+  match a with
+  | Arithmetic_operand.ArithmeticVar v ->
+    ( match get_furthest_instance v with
+      | VarExp v -> Var.equal !t1_ref !v
+      | _ -> false
+    )
+  | ArithmeticInt _ -> false
+
+let rec occurs (t1_ref : Exp.t Var.t ref) (t2_ref : Exp.t ref) =
+  match !t2_ref with
+  | VarExp v ->
+    ( match get_furthest_instance v with
+      | VarExp v -> Var.equal !t1_ref !v
+      | e -> occurs t1_ref (ref e)
+    )
+  | TermExp (_, el) -> List.fold el ~init:false ~f:(fun acc e -> acc || (occurs t1_ref e))
+  | IntExp _ -> false
+  | ArithmeticExp (_, l, r) -> (arithmetic_occurs t1_ref l) || (arithmetic_occurs t1_ref r)
+
+
 
 let rec unify (t1_ref : Exp.t ref) (t2_ref : Exp.t ref) (trail : Trail.t) =
   match (!t1_ref) with
-  | VarExp v -> (* TODO occurs check *)
+  | VarExp v ->
     (
       match Var.get_instance !v with
-      | None -> Trail.push trail v; Var.set_instance !v t2_ref; true
+      | None -> if (occurs v t2_ref) then false else (Trail.push trail v; Var.set_instance !v t2_ref; true)
       | Some e -> unify e t2_ref trail
     )
   | TermExp (sname, sargs) ->

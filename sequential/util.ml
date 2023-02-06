@@ -213,6 +213,8 @@ let rec occurs (n : string) t =
 
 (* John suggested considering the language guarantee that unifying a variable with anything is O(1).
 We have an occurs check in here, however, so it's not O(1), I don't think *)
+
+(* TODO - does this condense lists of substitutions where possible? Should it?*)
 let rec unify constraints =
     match constraints with
     | [] -> Some []
