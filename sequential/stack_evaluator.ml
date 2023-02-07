@@ -21,6 +21,9 @@ let rec eval_inner q db results =
   | None ->  results    (* no more of the tree to search so finished *)
   | Some ([], env) -> eval_inner q db (env::results) (* No further subgoals to prove in this job
                                                      so add the substitution to the results *)
+                        (* TODO would it make more sense to just keep the relevant parts of the environment e.g.
+                        only the stuff relevant to variables we started with?
+                        *)
   | Some (g1::gl, env) -> ((
       (* we have at least one more subgoal (g1) to prove in this job *)
       match g1 with

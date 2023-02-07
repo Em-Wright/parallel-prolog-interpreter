@@ -119,7 +119,8 @@ let rec copy (t_ref : Exp.t ref ) trail : Exp.t ref = match !t_ref with
     let args2 = List.map args ~f:(fun arg -> copy arg trail) in
     Exp.TermExp (name, args2) |> ref
   | IntExp i -> Exp.IntExp i |> ref
-  | ArithmeticExp (operator, op1, op2) -> Exp.ArithmeticExp (operator, (copy_arithmetic op1 trail), (copy_arithmetic op2 trail)) |> ref
+  | ArithmeticExp (operator, op1, op2) ->
+    Exp.ArithmeticExp (operator, (copy_arithmetic op1 trail), (copy_arithmetic op2 trail)) |> ref
 
 let rec get_furthest_instance (v : Exp.t Var.t ref) =
   match !v.instance with
