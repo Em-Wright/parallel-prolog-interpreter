@@ -20,7 +20,7 @@ module Var = struct
   let to_string {name; instance} (f : 'a -> string) =
     match instance with
     | None -> "Var" ^ name
-    | Some x -> f !x
+    | Some x -> "Var" ^ name ^" -> "^ (f !x)
 
   let equal v1 v2 = String.equal v1.name v2.name
 
@@ -30,7 +30,17 @@ module Var = struct
       | None -> None
       | Some e -> copy_f e |> ref |> Some
     in
-    {name = v.name; instance}
+    {name = fresh (); instance}
+
+  let reref_vars v tbl reref_f var_wrap_f deep_copy_f =
+    match !v.instance with
+    | None ->
+      (
+        match Hashtbl.find tbl !v.name with
+        | None -> deep_copy !v deep_copy_f |> var_wrap_f
+        | Some v2 -> var_wrap_f v2
+      )
+    | Some e -> reref_f !e tbl
 
 end
 
@@ -57,13 +67,16 @@ module Arithmetic_operand = struct
     | ArithmeticVar v -> ArithmeticVar (Var.deep_copy !v copy_f |> ref)
 
 
-  let reref_vars t copy_f tbl =
+  let reref_vars t copy_f reref_f tbl =
     match t with
     | ArithmeticInt _ -> t
     | ArithmeticVar v -> (
-        match Hashtbl.find tbl (Var.name !v) with
-        | None -> Var.deep_copy !v copy_f |> ref |> ArithmeticVar
-        | Some v2 -> ArithmeticVar (ref v2)
+        Var.reref_vars v tbl reref_f (fun v -> ArithmeticVar (ref v)) copy_f
+      |> ArithmeticVar
+        (* TODO - need to check if v has an instance *)
+        (* match Hashtbl.find tbl (Var.name !v) with *)
+        (* | None -> Var.deep_copy !v copy_f |> ref |> ArithmeticVar *)
+        (* | Some v2 -> ArithmeticVar (v2) *)
       )
 end
 
@@ -126,18 +139,20 @@ module Exp = struct
 
     let rec reref_vars e tbl =
       match e with
-      | VarExp v ->
-        (
-          match Hashtbl.find tbl (Var.name !v) with
-          | None -> Var.deep_copy !v deep_copy |> ref |> VarExp
-          | Some v2 -> VarExp (ref v2)
-        )
+      | VarExp v -> (* need to first check if v has an instance, and if so, apply the replacement to that *)
+        Var.reref_vars v tbl reref_vars (fun v -> VarExp (ref v)) deep_copy
+        (* ( *)
+        (*   match Hashtbl.find tbl (Var.name !v) with *)
+        (*   | None -> Var.deep_copy !v deep_copy |> ref |> VarExp *)
+        (*   | Some v2 -> VarExp (ref v2) *)
+        (* ) *)
       | IntExp _ -> e
       | TermExp (n, args) -> let new_args = List.map args ~f:(fun arg -> reref_vars !arg tbl |> ref) in
         TermExp (n, new_args)
       | ArithmeticExp (operator, op1, op2) ->
-        let op1_v2 = Arithmetic_operand.reref_vars op1 (fun e -> deep_copy e) tbl in
-        let op2_v2 = Arithmetic_operand.reref_vars op2 (fun e -> deep_copy e) tbl in
+        (* TODO repeat for arithmetic *)
+        let op1_v2 = Arithmetic_operand.reref_vars op1 (fun e -> deep_copy e) reref_vars tbl in
+        let op2_v2 = Arithmetic_operand.reref_vars op2 (fun e -> deep_copy e) reref_vars tbl in
         ArithmeticExp (operator, op1_v2, op2_v2)
 
 end
@@ -277,55 +292,76 @@ let resolve_arith (a : Exp.t Arithmetic_operand.t) =
     in
     resolve_inner (Var.get_instance !v)
 
-let rec resolve (e : Exp.t) =
+let rec resolve_to_exp (e : Exp.t) =
   match e with
   | IntExp _ -> e
   | VarExp v -> (match Var.get_instance !v with
       | None -> e
-      | Some v -> resolve !v
+      | Some v -> resolve_to_exp !v
     )
   | _ -> e
 
+let rec resolve_to_var (e : Exp.t) =
+  match e with
+  | IntExp _ -> None
+  | VarExp v -> (match Var.get_instance !v with
+      | None -> Some v
+      | Some v -> resolve_to_var !v
+    )
+  | _ -> None
+
 module Job = struct
-  type t = {goals : Exp.t list; var_mapping : Exp.t Var.t String.Table.t }
+  type t = {goals : Exp.t ref list; var_mapping : Exp.t Var.t ref String.Table.t }
+
+  let flatten_var_mapping (var_mapping : Exp.t Var.t ref String.Table.t) =
+    let new_mapping = String.Table.create () in
+    Hashtbl.iteri var_mapping
+      ~f:(fun ~key ~data ->
+          let rec iter_instances v =
+            match Var.get_instance !v with
+            | None -> v
+            | Some e -> (
+                match !e with
+                | Exp.VarExp v2 -> let v3 = iter_instances v2 in
+                  Hashtbl.add_exn var_mapping ~key:(Var.name !v2) ~data:v3;
+                  v3
+                | _ -> v
+              )
+          in
+          Hashtbl.add_exn new_mapping ~key ~data;
+          ignore (iter_instances data)
+        );
+    new_mapping
 
   let deep_copy {goals; var_mapping} =
-    (* TODO - need vars to be compatible when copied i.e. if we have a V273 in the
-       var_mapping, and referenced somewhere in the goals, we need them to point to
-       the same place. Maybe we build a hashmap of all variable names, and use that to
-       find vars in the goals?
-
-       Maybe we have the var_mapping be such a structure to begin with i.e. it doesn't
-       only map the original variables, but also any additional variables we create as we go.
-       Not sure if that would just be really inefficient tho.
-    *)
-
+    (* idea here is to copy a set of goals and the var_mapping such that the variable
+    references still match up *)
     let new_var_mapping = String.Table.map var_mapping ~f:(fun v ->
-        Var.deep_copy v (fun e -> Exp.deep_copy e)
+        Var.deep_copy !v (fun e -> Exp.deep_copy e) |> ref
       )
     in
-    let new_goals = List.map goals ~f:(fun e -> Exp.reref_vars e new_var_mapping) in
+    let old_to_new_var_mapping = flatten_var_mapping new_var_mapping in
+    let new_goals = List.map goals ~f:(fun e -> Exp.reref_vars !e old_to_new_var_mapping |> ref) in
     {goals=new_goals; var_mapping=new_var_mapping}
 
 end
 
 
 let rec eval_inner (q : Job.t Deque.t) db results =
-  (* TODO why dequeue_back and not dequeue_front? *)
   match (Deque.dequeue_back q) with
   | None -> results
   | Some job -> (
       match job.goals with
-      | [] -> let soln = realise_solution job.var_mapping in eval_inner q db (soln::results)
+      | [] -> let soln = realise_solution job.var_mapping in
+        print_solution job.var_mapping;
+        eval_inner q db (soln::results)
       | g1::gl -> (
           (
-            match g1 with
+            match !g1 with
             (* if goal is the true predicate *)
             | Exp.TermExp("true", []) -> Deque.enqueue_back q {goals=gl;var_mapping=job.var_mapping}
             | TermExp("equals", [lhs; rhs]) ->
               (* check if the lhs and rhs can unify *)
-              (* TODO - we now need the unify function to not cause permanent changes - I guess we
-              can use a mini trail to keep track of stuff? then discard the trail again after *)
               let trail = Trail.create () in
               if (unify lhs rhs trail) then (
                 Deque.enqueue_back q {goals=gl; var_mapping=job.var_mapping}
@@ -411,44 +447,33 @@ let rec eval_inner (q : Job.t Deque.t) db results =
                   match db_copy with
                   | [] -> ()
                   | c::dbs -> (
-                               let (head, body) = Clause.deep_copy c trail in
-                               let trail = Trail.create () in
-                               if unify head g1 trail then (
-                                 (* TODO - do I need to deep_copy each of the goals??? And then also
-                                 would need to make sure the var_mapping matched it argh *)
-                                 Deque.enqueue_back q {goals=(body@gl); var_mapping=____??????}
-                               ) else Trail.undo trail;
-                               (* TODO this is where we're going to have a problem - we have to undo the trail
-                                  again before we can consider any more clauses, but we're relying on the trail
-                                  remaining constant across jobs. Maybe we are also gonna have to
-                                  pass a trail as part of the job? Seems a bit inefficient, but might not actually
-                                  be that much slower? Probably worth a check, at the very least.
-                                  The issue then also is that, since so many things are refs, how deep a copy do
-                                  we need to do?
-                                  Is there a way to have, instead of a marker, something that identifies a branch
-                                  in a tree? i.e. the trail becomes a tree of tracking assignments. But
-                                  we need that sort of structure for the variables as well, in that case. Hm
-                                  So I need separate copies of some of the variables here. But separate copies
-                                  are only needed in the case where we have OR-parallelism.
-                                  Could attempt to identify which variables are only affected in this round, and
-                                  then copy those Vars, and keep just the end of the trail in the job as well.
-                                  So when we start a job, we potentially need to undo part of the trail, then
-                                  add some more stuff back on.
-                                  Maybe it would be best to try a version which copies everything, see how well
-                                  that works, then only after that see what we can go back to sharing.
-                                  So we'll need to remove a lot of refs? Maybe each job needs its own var_mapping,
-                                  which in turn leads it to its own set of variables.
-                                Tamara Norman's version says the trail becomes obsolete, since we just switch
-                                  environments instead.
-                               *)
-                               Trail.undo trail t;
-                               loop dbs
-                              )
+                      (* TODO - we're not retaining the relationship between the var_mapping and
+                      the goals when we copy it - issue with Job.deep_copy? *)
+                      let (head, body) = Clause.copy c in
+                      let trail = Trail.create () in
+                      print_endline ("trying: "^(Exp.to_string !head)^"  "^(Exp.to_string !g1));
+                      if unify head g1 trail then (
+                        print_endline ("unified "^(Exp.to_string !head)^"  "^(Exp.to_string !g1));
+                        let gl_string = List.to_string (body@gl) ~f:(fun g -> Exp.to_string !g) in
+                        print_endline ("remaining goals1: "^gl_string);
+                        let new_job = Job.deep_copy {goals=(body@gl); var_mapping=job.var_mapping} in
+                        let gl_string = List.to_string new_job.goals ~f:(fun g -> Exp.to_string !g) in
+                        print_endline ("remaining goals: "^gl_string);
+                        print_endline ("soln so far: ");
+                        (print_solution new_job.var_mapping);
+                        (* TODO So our copying of jobs is not working - we've copied the var_mapping
+                        to a completely separate variable than the goals :( *)
+                        print_endline "\n";
+                        Deque.enqueue_back q new_job
+                      ) ;
+                      Trail.undo trail;
+                      loop dbs
+                    )
                 in
                 loop db_copy )
-            | _ -> eval_query gl db trail var_mapping
+            | _ -> ()
           );
-          eval_inner q db var_mapping results
+          eval_inner q db results
         )
     )
 
@@ -481,9 +506,10 @@ let rec convert (t : Ast.exp) var_mapping : Exp.t =
     ArithmeticExp (op, new_op1, new_op2)
 
 
+
 let command =
   Command.basic
-    ~summary:"Sequential Prolog interpreter using a trail stack"
+    ~summary:"Sequential Prolog interpreter using a unification by assignment"
     [%map_open.Command
       let filename =
         flag
@@ -506,8 +532,18 @@ let command =
               in
               let var_mapping = String.Table.create () in
               let b_converted : Exp.t ref list = List.map b ~f:(fun e -> convert e var_mapping |> ref ) in
-              let trail = Stack.create () in
-              eval_query b_converted db_converted trail var_mapping;
-              []
+              let q = Deque.create () in
+              Deque.enqueue_front q ({goals=b_converted; var_mapping} : Job.t);
+              print_endline "initial assignment: ";
+              print_solution var_mapping;
+              print_endline "-------------";
+              let res = eval_inner q db_converted [] in
+              List.iter res ~f:(fun result ->
+                  print_endline "=================================== temp";
+                  List.iter result ~f:(fun (a,b) ->
+                      print_endline (a ^ " = "^b)
+                    );
+                  print_endline "===============";
+                ); []
             )
     ]
