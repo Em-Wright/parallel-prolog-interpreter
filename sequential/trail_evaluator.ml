@@ -98,7 +98,8 @@ end
 let copy_arithmetic (a : Exp.t Arithmetic_operand.t) trail : Exp.t Arithmetic_operand.t =
   match a with
   | ArithmeticInt i -> ArithmeticInt i
-  | ArithmeticVar v -> (
+  | ArithmeticVar v ->
+    (
       if not (Var.has_instance !v) then
         (Trail.push trail v; Var.set_instance !v (ref (Exp.VarExp (ref (Var.create ())))));
       match !(Var.get_instance !v |> Option.value_exn) with
@@ -387,9 +388,10 @@ let command =
         Interface.main filename
           ~eval_function:(fun db b ->
               (* convert the db and b into the required formats then feed to the eval function *)
-              let var_mapping = String.Table.create () in
               let db_converted : Clause.t list = List.map db
-                  ~f:(fun dec -> match dec with
+                  ~f:(fun dec ->
+                      let var_mapping = String.Table.create () in
+                      match dec with
                       | Clause (h, b) -> let h2 = convert h var_mapping in
                         let b2 = List.map b ~f:(fun e -> convert e var_mapping |> ref) in
                         (ref h2, b2)
