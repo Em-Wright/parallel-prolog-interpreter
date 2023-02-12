@@ -1,42 +1,40 @@
 open Core
 open Async
-open Prolog_interpreter.Ast
-open Prolog_interpreter.Util
+open Prolog_interpreter.Trail_util
 open Include
 
-let (fresh, reset, update) =
-  let nxt = ref 0 in
-  let f () = (nxt := !nxt + 1; !nxt) in
-  let r () = nxt := 0 in
-  let u n = nxt := Int.max !nxt n in
-  (f, r, u)
-
-let rename_vars_in_dec d =
-  match d with
-  | Clause (h, b) ->
-    let head_vars = find_vars [h] in
-    let body_vars = find_vars b in
-    (* find uniq vars from both head and body *)
-    let vars : exp list = uniq (head_vars @ body_vars) in
-    (* get fresh variable mappings *)
-    let sub = List.map ~f:(fun x -> (x, VarExp (fresh() |> Int.to_string))) vars in
-    (* substitute new names for variables *)
-    Clause (sub_lift_goal sub h, sub_lift_goals sub b)
-  | Query (b) ->
-    (* find uniq vars in query *)
-    let body_vars = find_vars b in
-    (* get fresh variable mappings *)
-    let vars = uniq (body_vars) in
-    let sub = List.map ~f:(fun x -> (x, VarExp (fresh() |> Int.to_string))) vars in
-    (* substitute new names for variables *)
-    Query (sub_lift_goals sub b)
+(* TODO - need to create modules for sending jobs - we can't send references *)
 
 module Job = struct
   type t = {
-    goals : exp list;
-    env : ((exp * exp) list);
+    goals : Exp.t ref list;
+    var_mapping : Exp.t Var.t String.Table.t;
     path : int list
   } [@@deriving bin_io, fields]
+
+  (* type for_sending = { *)
+  (*   goals : Exp.for_sending list; *)
+  (*   var_mapping : Exp.for_sending Var.for_sending String.Table.t; *)
+  (*   path : int list *)
+  (* } [@@deriving bin_io, fields] *)
+
+  let deep_copy {goals; var_mapping; path} =
+    let var_translation = String.Table.create () in
+    let new_var_mapping = String.Table.map var_mapping ~f:(fun v ->
+        Var.deep_copy v (fun e -> Exp.deep_copy e var_translation) var_translation
+      )
+    in
+    print_endline "old_var_mapping-----";
+    print_endline (String.Table.fold ~init:"" var_mapping
+                     ~f:(fun ~key ~data acc -> "("^key^", "^(Var.to_string data Exp.to_string)^")"^acc ));
+    print_endline "new_var_mapping-----";
+    print_endline (String.Table.fold ~init:"" var_translation
+                     ~f:(fun ~key ~data acc -> "("^key^", "^(Var.to_string !data Exp.to_string)^")"^acc ));
+    print_endline (String.Table.fold ~init:"" new_var_mapping
+                     ~f:(fun ~key ~data acc -> "("^key^", "^(Var.to_string data Exp.to_string)^")"^acc ));
+    print_endline "var_mapping ends-----";
+    let new_goals = List.map goals ~f:(fun e -> Exp.reref_vars !e var_translation |> ref) in
+    {goals=new_goals; var_mapping=new_var_mapping; path}
 end
 
 module Job_and_nxt = struct
@@ -47,12 +45,8 @@ module Job_and_bool = struct
   type t = Job.t * int * bool [@@deriving bin_io]
 end
 
-module Dec = struct
-  type t = dec [@@deriving bin_io]
-end
-
 module Results = struct
-  type t = ((exp * exp) list * int list )list [@@deriving bin_io]
+  type t = ((string * string) list * int list) list [@@deriving bin_io]
 
   let reverse_path_order t : t =
     List.map t ~f:( fun (env, path) -> (env, List.rev path))
@@ -68,13 +62,13 @@ end
 module T = struct
 
   module Worker_state = struct
-    type init_arg = (dec list * int)
+    type init_arg = (Clause.t list * int)
     [@@deriving bin_io]
 
     type t = {
       q : Job.t Deque.t;
       index : int;
-      mutable db : dec list;
+      mutable db : Clause.t list;
       mutable reader : unit Pipe.Reader.t;
       mutable writer : Worker_to_toplevel.t Pipe.Writer.t
     } [@@deriving fields]
@@ -86,153 +80,135 @@ module T = struct
   end
 
   (* eval takes
-     - a list of goals to prove (exp list)
-     - the environment to prove them in ((exp * exp) list)
-     - the database of rules to use to prove them (dec list)
+     - a job
+     - the database of clauses
      and returns the remainder of work to be done before this job is complete.
-     This is in the form of a list of jobs, each containing a list of goals
-     to prove, and an updated environment to prove them in. ((exp list) * ((exp * exp) list)) list.
+     This is in the form of a list of jobs.
 
      The function itself performs one step of evaluation on the job it is given, and
      either manages to prove it, returning the empty list, or generates one or more other
      jobs to be done.
   *)
-  let eval gs env db path =
-    match gs with
-    | g1::gl -> (
-        (* we have at least one more subgoal (g1) to prove in this job *)
-        match g1 with
-        | TermExp("true", []) -> [ (gl, env, path)]
-        | TermExp("equals", [lhs; rhs]) -> (
-            match unify [(lhs, rhs)] with
-            | Some s -> (
-                match unify (s@env) with
-                | Some env2 -> [(sub_lift_goals s gl, env2, path)]
-                | None -> []
-              )
-            | None -> []
-          )
-        | TermExp("not_equal", [lhs;rhs]) -> (
-            match unify [(lhs, rhs)] with
-            | Some s -> (
-                match unify (s@env) with
-                | Some _ -> []
-                | None -> [(gl, env, path)]
-              )
-            | None -> [ (gl, env, path) ]
-          )
-        | TermExp("greater_than", [lhs; rhs]) -> (
-            match lhs, rhs with
-            | IntExp i1, IntExp i2 -> if i1 > i2 then [(gl, env, path)] else []
-            | _ -> [] (* arguments insufficiently instantiated *)
-          )
-        | TermExp("less_than", [lhs; rhs]) ->
+  let eval (job : Job.t) db : Job.t list =
+    print_endline "called eval";
+      match job.goals with
+      | [] -> []
+      | g1::gl -> (
           (
-            match lhs, rhs with
-            | IntExp i1, IntExp i2 -> if i1 < i2 then [(gl, env, path)] else []
-            | _ -> [] (* arguments insufficiently instantiated *)
-          )
-        | TermExp("greater_than_or_eq", [lhs; rhs]) -> (
-            match lhs, rhs with
-            | IntExp i1, IntExp i2 -> if i1 >= i2 then [(gl, env, path)] else []
-            | _ -> [] (* arguments insufficiently instantiated *)
-          )
-        | TermExp("less_than_or_eq", [lhs; rhs]) ->
-          (
-            match lhs, rhs with
-            | IntExp i1, IntExp i2 -> if i1 <= i2 then [(gl, env, path)] else []
-            | _ -> [] (* arguments insufficiently instantiated *)
-          )
-        | TermExp("is", [lhs; rhs]) -> (
-            (* evaluate the arithmetic expressions with current substitutions, then check if it is
-                 possible to unify them with any additional substitutions *)
-            match rhs with
-            | ArithmeticExp (op, t1, t2) -> (
-                match t1, t2 with
-                | ArithmeticInt i1, ArithmeticInt i2 -> (
-                    let result = perform_arithmetic op i1 i2 in
-                    match lhs with
-                      | VarExp _ -> (
-                          match unify ((lhs, IntExp result)::env) with
-                          | Some env2 ->
-                            [ (
-                              sub_lift_goals [(lhs, IntExp result)] gl,
-                              env2,
-                              path
-                            )]
-                          | None -> []
+            print_endline ("popped: " ^ (Exp.to_string !g1));
+            match !g1 with
+            (* if goal is the true predicate *)
+            | Exp.TermExp("true", []) -> [ {goals=gl;var_mapping=job.var_mapping; path=job.path} ]
+            | TermExp("equals", [lhs; rhs]) ->
+              (* check if the lhs and rhs can unify *)
+              let trail = Trail.create () in
+              if (unify lhs rhs trail) then (
+                [ {goals=gl; var_mapping=job.var_mapping; path=job.path} ]
+              ) else (Trail.undo trail; [])
+            | TermExp("not_equal", [lhs;rhs]) -> (
+                (* check if the lhs and rhs can unify. If they can, this is not a
+                   successful substitution. If they don't, we can continue solving the
+                   rest of the goals
+                *)
+                let trail = Trail.create () in
+                if not (unify lhs rhs trail) then (
+                  Trail.undo trail;
+                  [ {goals=gl; var_mapping=job.var_mapping; path=job.path} ]
+                ) else (Trail.undo trail; [])
+              )
+            | TermExp("greater_than", [lhs; rhs]) -> (
+                match (resolve !lhs), (resolve !rhs) with
+                | IntExp i1, IntExp i2 ->
+                  if i1 > i2 then
+                    [ {goals=gl; var_mapping=job.var_mapping; path=job.path}]
+                  else []
+                | _ -> [] (* arguments insufficiently instantiated *)
+              )
+            | TermExp("greater_than_or_eq", [lhs; rhs]) -> (
+                match (resolve !lhs), (resolve !rhs) with
+                | IntExp i1, IntExp i2 ->
+                  if i1 >= i2 then
+                    [ {goals=gl; var_mapping=job.var_mapping; path=job.path}]
+                  else []
+                | _ -> [] (* arguments insufficiently instantiated *)
+              )
+            | TermExp("less_than", [lhs; rhs]) -> (
+                match (resolve !lhs), (resolve !rhs) with
+                | IntExp i1, IntExp i2 ->
+                  if i1 < i2 then
+                    [ {goals=gl; var_mapping=job.var_mapping; path=job.path}]
+                  else []
+                | _ -> [] (* arguments insufficiently instantiated *)
+              )
+            | TermExp("less_than_or_eq", [lhs; rhs]) -> (
+                match (resolve !lhs), (resolve !rhs) with
+                | IntExp i1, IntExp i2 ->
+                  if i1 <= i2 then
+                    [ {goals=gl; var_mapping=job.var_mapping; path=job.path}]
+                  else []
+                | _ -> [] (* arguments insufficiently instantiated *)
+              )
+            | TermExp("is", [lhs; rhs]) -> (
+                (* evaluate the arithmetic expressions with current substitutions, then check if it is
+                   possible to unify them with any additional substitutions *)
+                match !rhs with
+                | ArithmeticExp (op, t1, t2) -> (
+                    match (resolve_arith t1), (resolve_arith t2) with
+                    | ArithmeticInt i1, ArithmeticInt i2 -> (
+                        let result = perform_arithmetic op i1 i2 in
+                        (
+                          match !lhs with
+                          | VarExp _ -> let trail = Trail.create () in
+                            if unify lhs (ref (Exp.IntExp result)) trail then
+                              [{goals=gl; var_mapping=job.var_mapping; path=job.path}]
+                            else (Trail.undo trail ; [])
+                          | IntExp i -> if i = result then
+                              [{goals=gl; var_mapping=job.var_mapping; path=job.path}]
+                              else []
+                          | _ -> []
                         )
-                      | IntExp i -> if i = result then [(gl, env, path)] else []
+                      )
+                    | _ -> []
+                  )
+                | IntExp result -> (
+                    (
+                      match !lhs with
+                      | VarExp _ -> let trail = Trail.create () in
+                        if unify lhs (ref (Exp.IntExp result)) trail then
+                          [{goals=gl; var_mapping=job.var_mapping; path=job.path }]
+                        else (Trail.undo trail ; [])
+                      | IntExp i -> if i = result then
+                          [{goals=gl; var_mapping=job.var_mapping; path=job.path }]
+                          else []
                       | _ -> []
                     )
-                  | _ -> []
-              )
-            | IntExp result -> (
-                match lhs with
-                | VarExp _ ->
-                  ( match unify ((lhs, rhs)::env) with
-                    | Some env2 ->
-                      [(
-                        sub_lift_goals [(lhs, rhs)] gl,
-                        env2,
-                        path
-                      )]
-                    | None -> []
                   )
-                | IntExp i -> if i = result then [(gl, env, path)] else []
                 | _ -> []
+              )
+            | TermExp(_,_) -> (
+                print_endline "iter thru db";
+                let db_copy = List.map db ~f:(fun clause ->  Clause.copy clause ) in
+                List.foldi db_copy ~init:[]
+                  ~f:(fun i acc c ->
+                      let (head, body) = Clause.copy c in
+                      let trail = Trail.create () in
+                      if unify head g1 trail then (
+                        print_endline ("goals before copy: " ^ (List.to_string (body@gl) ~f:(fun gl -> Exp.to_string !gl) ));
+                        let new_job = Job.deep_copy
+                            {goals=(body@gl); var_mapping=job.var_mapping; path=(i::job.path)} in
+                        Trail.undo trail;
+                        print_endline ("goals after copy: " ^ (List.to_string new_job.goals
+                                                               ~f:(fun gl -> Exp.to_string !gl) ));
+                        (new_job)::acc
+                      ) else (
+                        Trail.undo trail;
+                        acc
+                      )
+                    )
               )
             | _ -> []
           )
-        (* if goal is some other predicate *)
-        | TermExp(_,_) -> (
-            List.foldi db ~init:[]
-              ~f:(fun i acc rule ->
-                  match (rename_vars_in_dec rule) with
-                  | Clause (h, body) -> (
-                      (* check if this rule can be used for this subgoal *)
-                      match unify [(g1, h)] with
-                      | Some s -> (
-                          match unify (s@env) with
-                          | Some env2 -> (
-                              if (List.length body = 1)
-                              then (
-                                match body with
-                                (* if the rule proved the subgoal (ie. rule was a
-                                     fact) then recurse on remaining subgoals
-                                *)
-                                | ((TermExp ("true", _)) :: _) ->
-                                  (
-                                    sub_lift_goals s gl,
-                                    env2,
-                                    i::path
-                                  )::acc
-                                | _ ->
-                                  (
-                                    (sub_lift_goals s body) @ (sub_lift_goals s gl),
-                                    env2,
-                                    i::path
-                                  )::acc
-                              )
-                              else
-                                (
-                                  (sub_lift_goals s body) @ (sub_lift_goals s gl),
-                                  env2,
-                                  i::path
-                                )::acc
-                            )
-                          | _ -> acc
-                        )
-                      (* this rule's head doesn't unify with the subgoal *)
-                      | _ -> acc
-                    )
-                  |  _ -> acc
-                ))
-        (* subgoal g1 isn't a TermExp *)
-        | _ -> [(gl, env, path)]
-      )
-    | [] -> []
-  ;;
+        )
 
   (* main takes the worker state and returns unit
      It loops, checking for and then handling updates from the toplevel, before
@@ -247,13 +223,15 @@ module T = struct
     Pipe.clear worker_state.reader;
     let init_results = match Deque.dequeue_back worker_state.q with
     | None -> []
-    | Some {goals =[]; env; path} -> [(env, path)]
-    | Some {goals; env; path} -> (
-        let jobs =
-          ( eval goals env worker_state.db path) in
+    | Some {goals =[]; var_mapping; path} -> [((realise_solution var_mapping), path)]
+    | Some job -> (
+        let goals_str = List.fold ~init:"" job.goals ~f:(fun acc g -> let gs = Exp.to_string !g in
+                                                        acc^","^gs) in
+        print_endline ("goals: "^goals_str);
+        let jobs = eval job worker_state.db in
         List.iter jobs
-          ~f:( fun (goals, env, path2) ->
-              Deque.enqueue_back worker_state.q {goals; env; path=path2} );
+          ~f:( fun new_job ->
+              Deque.enqueue_back worker_state.q new_job );
         []
       )
     in
@@ -269,7 +247,8 @@ module T = struct
     let%bind _ =
     if send_initial_jobs_bool then loop_send_jobs () else Deferred.unit
         in
-    let rec main_inner (results : ((exp * exp) list * int list) list) =
+    let rec main_inner (results : ((string * string) list * int list) list) =
+      print_endline "\n loop";
       let%bind _check_for_requests =
         (* NOTE - if you ever use a `read' function to check if there's
            anything in the pipe, make sure to use read_now - `read' waits
@@ -291,13 +270,16 @@ module T = struct
       in
       match Deque.dequeue_back worker_state.q with
       | None -> Pipe.write worker_state.writer (Results (Results.reverse_path_order results))
-      | Some {goals =[]; env; path} -> main_inner ((env, path)::results)
-      | Some {goals; env; path} -> (
-          let jobs =
-            ( eval goals env worker_state.db path) in
+      | Some {goals =[]; var_mapping; path} ->
+        let soln = realise_solution var_mapping in main_inner ((soln, path)::results)
+      | Some job -> (
+          let goals_str = List.fold ~init:"" job.goals ~f:(fun acc g -> let gs = Exp.to_string !g in
+                                                            acc^","^gs) in
+          print_endline ("goals: "^goals_str);
+          let jobs = eval job worker_state.db in
           List.iter jobs
-            ~f:( fun (goals, env, path2) ->
-                Deque.enqueue_back worker_state.q {goals; env; path=path2} );
+            ~f:( fun new_job ->
+                Deque.enqueue_back worker_state.q new_job );
           main_inner results
         )
     in
@@ -312,7 +294,7 @@ module T = struct
 
   type 'worker functions = {
     eval_query : ('worker, Job_and_bool.t, unit) Rpc_parallel_edit.Function.t;
-    update_db : ('worker, dec, unit) Rpc_parallel_edit.Function.t;
+    update_db : ('worker, Clause.t, unit) Rpc_parallel_edit.Function.t;
     worker_to_toplevel_pipe : ('worker, unit, Worker_to_toplevel.t Pipe.Reader.t) Rpc_parallel_edit.Function.t;
     toplevel_to_worker_pipe : ('worker, unit * unit Pipe.Reader.t, unit) Rpc_parallel_edit.Function.t
   }
@@ -350,7 +332,7 @@ module T = struct
     let update_db =
       C.create_rpc
         ~f:update_db_impl
-        ~bin_input:Dec.bin_t
+        ~bin_input:Clause.bin_t
         ~bin_output:Unit.bin_t
         ()
 
@@ -398,8 +380,9 @@ let init_workers n : Worker_info.t list Deferred.t =
           let%bind worker = spawn_exn
             ~on_failure:Error.raise
             ~shutdown_on:Heartbeater_connection_timeout
-            ~redirect_stdout:(`File_append ("/Users/em/Documents/diss_stdout"^(string_of_int i)^".txt"))
-            ~redirect_stderr:(`File_append "/Users/em/Documents/diss_stderr.log")
+            ~redirect_stdout:(`File_truncate
+                        ("/Users/em/OneDrive/Documents/Uni/II/Dissertation/diss_stdout"^(string_of_int i)^".txt"))
+            ~redirect_stderr:(`File_append "/Users/em/OneDrive/Documents/Uni/II/Dissertation/diss_stderr.log")
             ([], i)
           in
           let%bind conn = Connection.client_exn worker () in
@@ -416,37 +399,34 @@ let init_workers n : Worker_info.t list Deferred.t =
         )
   ;;
 
-(* add_dec_to_db takes a declaration (dec) and list of Worker_info.t and sends
-   the declaration to each of the workers to be added to their databases.
-   It returns unit.
+(* send_db_to_workers takes a list of clauses and list of Worker_info.t and sends
+   the clauses to each of the workers to be added to their databases.
+   It returns unit Deferred.t
 *)
-let add_dec_to_db dec workers_info =
+let send_db_to_workers db workers_info =
   let disallowed = ["true"; "is"; "list"; "empty_list"; "equals"; "not_equal"; "less_than";
                     "greater_than"; "less_than_or_eq"; "greater_than_or_eq"; "cut"]
   in
-  match dec with
-  | Clause (h, _) -> (
-      match h with
-      | TermExp (name, _) -> if List.exists disallowed ~f:(fun a -> String.equal name a )
+  Deferred.List.iter db ~f:(fun (h,b) ->
+      match !h with
+      | Exp.TermExp (name, _) -> if List.exists disallowed ~f:(fun a -> String.equal name a )
         then ( print_string ("Can't reassign '"^name^"' predicate\n"); Deferred.unit)
         else Deferred.List.iter ~how:`Parallel workers_info
-               ~f:(fun worker_info ->
-                   Connection.run_exn (Worker_info.conn worker_info) ~f:(functions.update_db) ~arg:dec
-                 )
+            ~f:(fun worker_info ->
+                Connection.run_exn (Worker_info.conn worker_info) ~f:(functions.update_db) ~arg:(h,b)
+              )
       | _ -> Deferred.List.iter ~how:`Parallel workers_info
                ~f:(fun worker_info ->
-                   Connection.run_exn (Worker_info.conn worker_info) ~f:(functions.update_db) ~arg:dec
+                   Connection.run_exn (Worker_info.conn worker_info) ~f:(functions.update_db) ~arg:(h,b)
                  )
     )
-  | Query _ -> Deferred.unit
-;;
 
 (* eval_query takes the body of a query (b) and a list of Worker_info.t
    It handles giving work to the workers and aggregating the results they give back.
    It loops until none of the workers have any work left, at which point it returns the
    aggregated results.
 *)
-let eval_query b worker_info_list =
+let eval_query (job : Job.t) worker_info_list =
   let num_workers = List.length worker_info_list in
   let have_work__requested_work = Hashtbl.of_alist_exn (module Int)
       (List.init num_workers ~f:(fun i -> (i, (false, false)))) in
@@ -485,7 +465,8 @@ let eval_query b worker_info_list =
   let accumulated_results = ref [] in
 
   (* start by giving work to the first worker, then requesting work if we have more than 1 worker *)
-  give_work 0 ({goals = b; env = []; path = []}, 0, true);
+  let b = if num_workers > 1 then true else false in
+  give_work 0 (job, 0, b);
   if num_workers > 1 then
        request_work 0;
 
@@ -547,7 +528,7 @@ let main filename num_workers =
   let%bind workers_info = init_workers num_workers in
    (
     let%bind () = (
-          let rec loop file_lines =
+          let rec loop file_lines db =
             (
               match file_lines with
               | s::ss -> (
@@ -561,17 +542,32 @@ let main filename num_workers =
 		                      )
 	                    ) lexbuf
                     in
-                    let%bind _ = (
+                    let%bind db2 = (
                     match dec with
-                    | Clause (_, _) -> add_dec_to_db dec workers_info
+                    | Clause (h, b) ->
+                      (* TODO - need to be careful about making sure the workers are using fresh variables
+                         relative to the variables being used in the db - need to bear this in mind when
+                         converting the db, when receiving jobs, when sending jobs.
+
+                         So we probably need a new convert function, a new Var.create - so a whole new Var
+                         module, new reref_var functions, new deep_copy functions. Hm.
+
+                         Sorted this by redefining fresh, reset and update in Trail_util
+                      *)
+                      let var_mapping = String.Table.create () in
+                      let h2 = convert h var_mapping in
+                      let b2 = List.map b ~f:(fun e -> convert e var_mapping |> ref) in
+                      (ref h2, b2)::db |> return
                     | Query b -> (
                         print_endline s;
-                        (* find all uniq VarExps in query *)
-                        let orig_vars = uniq (find_vars b) in
-                        (* find num of VarExps in query *)
-                        let orig_vars_num = List.length orig_vars in
+                        (* NOTE we create an empty var_mapping here so we don't have overlap between the rules and the
+                           query *)
+                        let var_mapping = String.Table.create () in
+                        let b_converted : Exp.t ref list = List.map b ~f:(fun e -> convert e var_mapping |> ref ) in
+                        (* send additional db entries to workers *)
+                        let%bind _ = send_db_to_workers db workers_info in
                         (* evaluate query *)
-                        let%bind res = eval_query b workers_info in
+                        let%bind res = eval_query {goals=b_converted; var_mapping; path=[]} workers_info in
                         let sorted_res = List.sort !res ~compare:(fun (_env1, path1) (_env2, path2) ->
                             (* need to sort by path *)
                             let a = List.compare Int.compare path1 path2 in
@@ -582,28 +578,29 @@ let main filename num_workers =
                         in
                         let envs = List.map sorted_res ~f:(fun (env, _) -> env) in
                         (* print the result *)
-                        print_string "\n";
-                        print_endline (string_of_res envs orig_vars orig_vars_num);
-                        print_string "\n\n";
-                        (* reset fresh variable counter *)
-                        reset ();
-                        Deferred.unit
+                        List.iter envs ~f:(fun result ->
+                            print_endline "===============";
+                            List.iter result ~f:(fun (a,b) ->
+                                print_endline (a ^ " = "^b)
+                              );
+                            print_endline "===============";
+                          ); return []
                       )
                   ) in
-                    loop ss
+                    loop ss db2
                   ) with
                   | Failure f -> ( (* in case of an error *)
                       print_endline ("Failure: " ^ f ^ "\n");
-                      loop ss
+                      loop ss db
                     )
                   | Parser.Error -> ( (* failed to parse input *)
                       print_endline "\nDoes not parse\n";
-                      loop ss
+                      loop ss db
                     )
                   | Lexer.EndInput -> exit 0 (* EOF *)
                   | _ -> ( (* Any other error *)
                       print_endline "\nUnrecognized error\n";
-                      loop ss
+                      loop ss db
                     )
                 )
               | [] -> return ()
@@ -611,7 +608,7 @@ let main filename num_workers =
           in
           print_endline ("Opening file " ^ filename ^ "\n");
           let file_lines = In_channel.read_lines filename in
-          let%bind () = loop file_lines in
+          let%bind () = loop file_lines [] in
           print_endline "\nFile contents loaded.\n"
         |> return
         )
@@ -621,7 +618,7 @@ let main filename num_workers =
 
 let command =
   Command.async
-    ~summary:"Parallel Prolog interpreter"
+    ~summary:"Parallel Trail-Stack Prolog interpreter"
     [%map_open.Command
       let filename =
         flag
