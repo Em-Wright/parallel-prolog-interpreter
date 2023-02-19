@@ -10,39 +10,125 @@ module Job = struct
     goals : Exp.t ref list;
     var_mapping : Exp.t Var.t String.Table.t;
     path : int list
-  } [@@deriving bin_io, fields]
+  } [@@deriving fields]
 
-  (* type for_sending = { *)
-  (*   goals : Exp.for_sending list; *)
-  (*   var_mapping : Exp.for_sending Var.for_sending String.Table.t; *)
-  (*   path : int list *)
-  (* } [@@deriving bin_io, fields] *)
+  type serialisable = {
+    goals : Exp.serialisable list;
+    var_mapping : String.t String.Table.t;
+    path : int list
+  } [@@deriving bin_io]
 
-  let deep_copy {goals; var_mapping; path} =
+  let serialise ({goals;var_mapping;path} : t) : serialisable =
+    print_endline "\n\n----------------\nSerialising: ";
+    let g1_string = List.to_string goals ~f:(fun g -> Exp.to_string !g) in
+    print_endline ("Not yet serialised goals: "^g1_string);
+    let var_string =
+      Hashtbl.fold ~init:""
+        var_mapping ~f:(fun ~key ~data acc ->
+            key^"->"^(Var.resolve_name data Exp.resolve_var_name)^", "^acc) in
+    print_endline ("Not yet serialised var_mapping: "^var_string^"\n---------------");
+
+    let goals = List.map goals ~f:(fun g -> Exp.serialise !g) in
+    let var_mapping = Hashtbl.map var_mapping ~f:(fun v -> Var.resolve_name v Exp.resolve_var_name) in
+    (* print_endline "\n"; *)
+    (* print_endline "serialising. serialised var_mapping: "; *)
+    (* Hashtbl.iteri var_mapping ~f:(fun ~key ~data -> print_endline (key^" : "^data)); *)
+    (* print_endline "serialised goals: "; *)
+    (* List.iter goals ~f:(fun g -> Exp.serialisable_to_string g |> print_endline ); *)
+    (* print_endline "-------------\n"; *)
+    let g1_string = List.to_string goals ~f:(fun g -> Exp.serialisable_to_string g) in
+    print_endline ("Goals serialised: "^g1_string);
+    let var_string =
+      Hashtbl.fold ~init:""
+        (var_mapping) ~f:(fun ~key ~data acc ->
+            key^"->"^data^", "^acc) in
+    print_endline ("var_mapping serialised: "^var_string^"\n------------------\n\n");
+    {goals; var_mapping; path}
+
+  (* TODO - when we're deserialising, we're not aligning variables which ought to be the same var
+     e.g. we have X->112, 112->113 when we should have X->112->113, Var_112 -> Var_113
+
+     This could be from the serialising process as well - we're clearly not linking things up
+  *)
+
+  (* TODO when we deserialise the var_mapping, add in variables for any variables along the way
+  i.e. if we have X->123->456, we should have an entry for each of the 3 vars in the deserialised
+  var_mapping
+     then reduce the var_mapping back to the original after
+  *)
+  let deserialise ({goals; var_mapping; path} : serialisable) : t =
+    print_endline "\n\n----------------\nDeserialising: ";
+    let g1_string = List.to_string goals ~f:(fun g -> Exp.serialisable_to_string g) in
+    print_endline ("\n\n goals serialised: "^g1_string);
+    let var_string =
+      Hashtbl.fold ~init:""
+        (var_mapping) ~f:(fun ~key ~data acc ->
+            key^"->"^data^", "^acc) in
+    print_endline (" var_mapping serialised: "^var_string);
+
+    let temp_var_mapping = String.Table.create () in
+    let var_mapping = Hashtbl.mapi var_mapping ~f:(fun ~key ~data:v_name ->
+        let v =
+          Hashtbl.find_or_add temp_var_mapping v_name
+            ~default:(fun () -> Var.create_named v_name)
+        in
+        Hashtbl.set temp_var_mapping ~key ~data:v;
+        v
+      )
+    in
+    Hashtbl.map_inplace var_mapping ~f:(
+      fun elt -> (* if it contains a var, check if it's in the temp var mapping, then map it if so *)
+        Var.reref_vars elt temp_var_mapping
+          (fun x -> )
+          (fun v -> VarExp v) (fun v _ _ -> v)
+    );
+
+    (* need to remap the var mapping using the temp var mapping *)
+    let goals = List.map goals ~f:(fun goal ->
+        Exp.deserialise goal temp_var_mapping |> ref
+      )
+    in
+
+    let temp_string = 
+      Hashtbl.fold ~init:""
+        temp_var_mapping ~f:(fun ~key ~data acc ->
+            key^"->"^(Var.resolve_name data Exp.resolve_var_name)^", "^acc) in
+    print_endline ("temp var mapping: "^temp_string);
+
+    let g1_string = List.to_string goals ~f:(fun g -> Exp.to_string !g) in
+    print_endline ("goals deserialised: "^g1_string);
+    let var_string =
+      Hashtbl.fold ~init:""
+        var_mapping ~f:(fun ~key ~data acc ->
+            key^"->"^(Var.resolve_name data Exp.resolve_var_name)^", "^acc) in
+    print_endline ("var_mapping  deserialised: "^var_string^"\n\n");
+    {goals; var_mapping; path}
+
+  let deep_copy ({goals; var_mapping; path} : t) : t =
     let var_translation = String.Table.create () in
     let new_var_mapping = String.Table.map var_mapping ~f:(fun v ->
         Var.deep_copy v (fun e -> Exp.deep_copy e var_translation) var_translation
       )
     in
-    print_endline "old_var_mapping-----";
-    print_endline (String.Table.fold ~init:"" var_mapping
-                     ~f:(fun ~key ~data acc -> "("^key^", "^(Var.to_string data Exp.to_string)^")"^acc ));
-    print_endline "new_var_mapping-----";
-    print_endline (String.Table.fold ~init:"" var_translation
-                     ~f:(fun ~key ~data acc -> "("^key^", "^(Var.to_string !data Exp.to_string)^")"^acc ));
-    print_endline (String.Table.fold ~init:"" new_var_mapping
-                     ~f:(fun ~key ~data acc -> "("^key^", "^(Var.to_string data Exp.to_string)^")"^acc ));
-    print_endline "var_mapping ends-----";
+    (* print_endline "old_var_mapping-----"; *)
+    (* print_endline (String.Table.fold ~init:"" var_mapping *)
+    (*                  ~f:(fun ~key ~data acc -> "("^key^", "^(Var.to_string data Exp.to_string)^")"^acc )); *)
+    (* print_endline "new_var_mapping-----"; *)
+    (* print_endline (String.Table.fold ~init:"" var_translation *)
+    (*                  ~f:(fun ~key ~data acc -> "("^key^", "^(Var.to_string !data Exp.to_string)^")"^acc )); *)
+    (* print_endline (String.Table.fold ~init:"" new_var_mapping *)
+    (*                  ~f:(fun ~key ~data acc -> "("^key^", "^(Var.to_string data Exp.to_string)^")"^acc )); *)
+    (* print_endline "var_mapping ends-----"; *)
     let new_goals = List.map goals ~f:(fun e -> Exp.reref_vars !e var_translation |> ref) in
     {goals=new_goals; var_mapping=new_var_mapping; path}
 end
 
 module Job_and_nxt = struct
-  type t = Job.t * int [@@deriving bin_io]
+  type t = Job.serialisable * int [@@deriving bin_io]
 end
 
 module Job_and_bool = struct
-  type t = Job.t * int * bool [@@deriving bin_io]
+  type t = Job.serialisable * int * bool [@@deriving bin_io]
 end
 
 module Results = struct
@@ -62,7 +148,7 @@ end
 module T = struct
 
   module Worker_state = struct
-    type init_arg = (Clause.t list * int)
+    type init_arg = (Clause.serialisable list * int)
     [@@deriving bin_io]
 
     type t = {
@@ -90,12 +176,12 @@ module T = struct
      jobs to be done.
   *)
   let eval (job : Job.t) db : Job.t list =
-    print_endline "called eval";
+    (* print_endline "called eval"; *)
       match job.goals with
       | [] -> []
       | g1::gl -> (
           (
-            print_endline ("popped: " ^ (Exp.to_string !g1));
+            (* print_endline ("popped: " ^ (Exp.to_string !g1)); *)
             match !g1 with
             (* if goal is the true predicate *)
             | Exp.TermExp("true", []) -> [ {goals=gl;var_mapping=job.var_mapping; path=job.path} ]
@@ -186,19 +272,21 @@ module T = struct
                 | _ -> []
               )
             | TermExp(_,_) -> (
-                print_endline "iter thru db";
+                (* print_endline "iter thru db"; *)
                 let db_copy = List.map db ~f:(fun clause ->  Clause.copy clause ) in
                 List.foldi db_copy ~init:[]
                   ~f:(fun i acc c ->
                       let (head, body) = Clause.copy c in
                       let trail = Trail.create () in
+                      (* print_endline ("Trying rule: "^(Exp.to_string !head)); *)
                       if unify head g1 trail then (
-                        print_endline ("goals before copy: " ^ (List.to_string (body@gl) ~f:(fun gl -> Exp.to_string !gl) ));
+                        (* print_endline ("Found unifying rule: "^(Exp.to_string !head)^" "^(Exp.to_string !g1)); *)
+                        (* print_endline ("goals before copy: " ^ (List.to_string (body@gl) ~f:(fun gl -> Exp.to_string !gl) )); *)
                         let new_job = Job.deep_copy
                             {goals=(body@gl); var_mapping=job.var_mapping; path=(i::job.path)} in
                         Trail.undo trail;
-                        print_endline ("goals after copy: " ^ (List.to_string new_job.goals
-                                                               ~f:(fun gl -> Exp.to_string !gl) ));
+                        (* print_endline ("goals after copy: " ^ (List.to_string new_job.goals *)
+                        (*                                        ~f:(fun gl -> Exp.to_string !gl) )); *)
                         (new_job)::acc
                       ) else (
                         Trail.undo trail;
@@ -225,9 +313,9 @@ module T = struct
     | None -> []
     | Some {goals =[]; var_mapping; path} -> [((realise_solution var_mapping), path)]
     | Some job -> (
-        let goals_str = List.fold ~init:"" job.goals ~f:(fun acc g -> let gs = Exp.to_string !g in
-                                                        acc^","^gs) in
-        print_endline ("goals: "^goals_str);
+        (* let goals_str = List.fold ~init:"" job.goals ~f:(fun acc g -> let gs = Exp.to_string !g in *)
+        (*                                                 acc^","^gs) in *)
+        (* print_endline ("goals: "^goals_str); *)
         let jobs = eval job worker_state.db in
         List.iter jobs
           ~f:( fun new_job ->
@@ -240,7 +328,7 @@ module T = struct
           match Deque.dequeue_front worker_state.q with
           | None -> Deferred.unit (* Should never happen *)
           | Some job -> ignore (Pipe.read_now worker_state.reader);
-            let%bind _ = Pipe.write worker_state.writer (Job (job, fresh ())) in
+            let%bind _ = Pipe.write worker_state.writer (Job (Job.serialise job, fresh ())) in
             loop_send_jobs ()
         ) else Deferred.unit
     in
@@ -248,7 +336,7 @@ module T = struct
     if send_initial_jobs_bool then loop_send_jobs () else Deferred.unit
         in
     let rec main_inner (results : ((string * string) list * int list) list) =
-      print_endline "\n loop";
+      (* print_endline "\n loop"; *)
       let%bind _check_for_requests =
         (* NOTE - if you ever use a `read' function to check if there's
            anything in the pipe, make sure to use read_now - `read' waits
@@ -264,18 +352,25 @@ module T = struct
                 match Deque.dequeue_front worker_state.q with
                 | None -> Deferred.unit (* Should never happen *)
                 | Some job -> ignore (Pipe.read_now worker_state.reader);
-                  Pipe.write worker_state.writer (Job (job, fresh ()))
+                  Pipe.write worker_state.writer (Job (Job.serialise job, fresh ()))
               ) else Deferred.unit
             )
       in
       match Deque.dequeue_back worker_state.q with
       | None -> Pipe.write worker_state.writer (Results (Results.reverse_path_order results))
       | Some {goals =[]; var_mapping; path} ->
-        let soln = realise_solution var_mapping in main_inner ((soln, path)::results)
+        let soln = realise_solution var_mapping in
+        print_endline "solutions =============";
+        List.iter soln ~f:(fun (key, data) -> print_endline (key^" = "^data));
+        print_endline "===============";
+        main_inner ((soln, path)::results)
       | Some job -> (
           let goals_str = List.fold ~init:"" job.goals ~f:(fun acc g -> let gs = Exp.to_string !g in
                                                             acc^","^gs) in
           print_endline ("goals: "^goals_str);
+          let var_map_string = String.Table.fold job.var_mapping ~init:""
+              ~f:(fun ~key ~data acc -> "(" ^ key ^ "," ^ (Var.to_string data Exp.to_string) ^ ")"^acc) in
+          print_endline ("var_mapping: "^var_map_string);
           let jobs = eval job worker_state.db in
           List.iter jobs
             ~f:( fun new_job ->
@@ -290,11 +385,21 @@ module T = struct
   let initialise ((init_db, index) : Worker_state.init_arg) : Worker_state.t  =
     let q = Deque.create () in
     let (_, temp_writer) = Pipe.create () in
-    {q; index; db = init_db; reader = Pipe.empty (); writer = temp_writer}
+    {
+      q;
+      index;
+      db = (
+        List.map init_db ~f:(
+          fun rule -> Clause.deserialise rule (String.Table.create ())
+        )
+      );
+      reader = Pipe.empty ();
+      writer = temp_writer
+    }
 
   type 'worker functions = {
     eval_query : ('worker, Job_and_bool.t, unit) Rpc_parallel_edit.Function.t;
-    update_db : ('worker, Clause.t, unit) Rpc_parallel_edit.Function.t;
+    update_db : ('worker, Clause.serialisable, unit) Rpc_parallel_edit.Function.t;
     worker_to_toplevel_pipe : ('worker, unit, Worker_to_toplevel.t Pipe.Reader.t) Rpc_parallel_edit.Function.t;
     toplevel_to_worker_pipe : ('worker, unit * unit Pipe.Reader.t, unit) Rpc_parallel_edit.Function.t
   }
@@ -304,14 +409,19 @@ module T = struct
        with type worker_state := Worker_state.t
         and type connection_state := Connection_state.t) =
   struct
-    let eval_query_impl ~worker_state ~conn_state:() (job, highest_var, send_initial_jobs_bool) =
+    let eval_query_impl ~worker_state ~conn_state:() ((job : Job.serialisable), highest_var, send_initial_jobs_bool) =
+      print_endline ("Updating highest_var: "^(Int.to_string highest_var)^"\n\n");
       update highest_var;
+
+      let job = Job.deserialise job in
+
       Deque.enqueue_back (Worker_state.q worker_state) job;
       main worker_state send_initial_jobs_bool
     ;;
 
     let update_db_impl ~worker_state ~conn_state:() d =
-      Worker_state.set_db worker_state (d::worker_state.db) |> return
+      let d2 = Clause.deserialise d (String.Table.create ()) in
+      Worker_state.set_db worker_state (d2::worker_state.db) |> return
     ;;
 
     let worker_to_toplevel_pipe_impl ~worker_state ~conn_state:() _ =
@@ -332,7 +442,7 @@ module T = struct
     let update_db =
       C.create_rpc
         ~f:update_db_impl
-        ~bin_input:Clause.bin_t
+        ~bin_input:Clause.bin_serialisable
         ~bin_output:Unit.bin_t
         ()
 
@@ -403,7 +513,7 @@ let init_workers n : Worker_info.t list Deferred.t =
    the clauses to each of the workers to be added to their databases.
    It returns unit Deferred.t
 *)
-let send_db_to_workers db workers_info =
+let send_db_to_workers (db : Clause.t list) workers_info =
   let disallowed = ["true"; "is"; "list"; "empty_list"; "equals"; "not_equal"; "less_than";
                     "greater_than"; "less_than_or_eq"; "greater_than_or_eq"; "cut"]
   in
@@ -413,11 +523,17 @@ let send_db_to_workers db workers_info =
         then ( print_string ("Can't reassign '"^name^"' predicate\n"); Deferred.unit)
         else Deferred.List.iter ~how:`Parallel workers_info
             ~f:(fun worker_info ->
-                Connection.run_exn (Worker_info.conn worker_info) ~f:(functions.update_db) ~arg:(h,b)
+                Connection.run_exn
+                  (Worker_info.conn worker_info)
+                  ~f:(functions.update_db)
+                  ~arg:(Clause.serialise (h,b))
               )
       | _ -> Deferred.List.iter ~how:`Parallel workers_info
                ~f:(fun worker_info ->
-                   Connection.run_exn (Worker_info.conn worker_info) ~f:(functions.update_db) ~arg:(h,b)
+                   Connection.run_exn
+                     (Worker_info.conn worker_info)
+                     ~f:(functions.update_db)
+                     ~arg:(Clause.serialise (h,b))
                  )
     )
 
@@ -426,7 +542,7 @@ let send_db_to_workers db workers_info =
    It loops until none of the workers have any work left, at which point it returns the
    aggregated results.
 *)
-let eval_query (job : Job.t) worker_info_list =
+let eval_query (job : Job.serialisable) worker_info_list =
   let num_workers = List.length worker_info_list in
   let have_work__requested_work = Hashtbl.of_alist_exn (module Int)
       (List.init num_workers ~f:(fun i -> (i, (false, false)))) in
@@ -447,6 +563,8 @@ let eval_query (job : Job.t) worker_info_list =
       )
   in
   let give_work index (job, n, b) =
+    (* let g1_string = List.to_string (Job.goals job) ~f:(fun g -> Exp.to_string !g) in *)
+    (* print_endline ("Initial goals sent to worker: "^g1_string); *)
     don't_wait_for
       (
         Connection.run_exn
@@ -545,15 +663,6 @@ let main filename num_workers =
                     let%bind db2 = (
                     match dec with
                     | Clause (h, b) ->
-                      (* TODO - need to be careful about making sure the workers are using fresh variables
-                         relative to the variables being used in the db - need to bear this in mind when
-                         converting the db, when receiving jobs, when sending jobs.
-
-                         So we probably need a new convert function, a new Var.create - so a whole new Var
-                         module, new reref_var functions, new deep_copy functions. Hm.
-
-                         Sorted this by redefining fresh, reset and update in Trail_util
-                      *)
                       let var_mapping = String.Table.create () in
                       let h2 = convert h var_mapping in
                       let b2 = List.map b ~f:(fun e -> convert e var_mapping |> ref) in
@@ -563,10 +672,15 @@ let main filename num_workers =
                         (* NOTE we create an empty var_mapping here so we don't have overlap between the rules and the
                            query *)
                         let var_mapping = String.Table.create () in
-                        let b_converted : Exp.t ref list = List.map b ~f:(fun e -> convert e var_mapping |> ref ) in
+                        let b_converted : Exp.serialisable list = List.map b
+                            ~f:(fun e -> convert_serialisable e var_mapping ) in
                         (* send additional db entries to workers *)
                         let%bind _ = send_db_to_workers db workers_info in
                         (* evaluate query *)
+                        print_endline "Initial var_mapping sent to worker:";
+                        String.Table.iteri var_mapping ~f:(fun ~key ~data ->
+                            print_endline ("key: "^key);
+                            print_endline (key ^" ->"^data));
                         let%bind res = eval_query {goals=b_converted; var_mapping; path=[]} workers_info in
                         let sorted_res = List.sort !res ~compare:(fun (_env1, path1) (_env2, path2) ->
                             (* need to sort by path *)
