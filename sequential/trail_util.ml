@@ -10,46 +10,70 @@ let (fresh, reset, update) =
 module Var = struct
   (* This 'a is used so that Var.t can reference Exp.t *)
   type 'a t = {name : string ; mutable instance : 'a ref option}
-  [@@deriving bin_io]
+  [@@deriving fields]
 
-  let create () =
+  type 'b serialisable = {name : string; instance : 'b option}
+  [@@deriving bin_io, fields]
+
+  let create () : 'a t =
     {name = fresh () |> string_of_int; instance = None}
 
-  let create_named name =
+  let create_named name : 'a t =
     {name ; instance = None}
 
   let name t = t.name
-  let reset t = t.instance <- None
-  let set_instance t p = t.instance <- Some p
+  let reset (t : 'a t) = t.instance <- None
+  let set_instance (t : 'a t) p = t.instance <- Some p
 
-  let has_instance t = Option.is_some t.instance
+  let has_instance (t : 'a t) = Option.is_some t.instance
 
-  let get_instance t = t.instance
+  let get_instance (t : 'a t) = t.instance
 
-  let to_string {name; instance} (f : 'a -> string) =
+  let to_string ({name; instance} : 'a t) (f : 'a -> string) =
     match instance with
     | None -> "Var_" ^ name
-    (* | Some x -> "Var" ^ name ^ " -> "^ (f !x) *)
-    | Some x -> f !x
+    | Some x -> (f !x)
 
-  let resolve_name {name; instance} (f : 'a -> string) =
+  let get_all_var_names ({name;instance} : 'b serialisable) ( f : 'b -> string list -> string list) acc =
+    match instance with
+    | None -> name::acc
+    | Some e -> f e acc
+
+  let serialisable_to_string ({name; instance} : 'b serialisable) (f : 'b -> string) =
+    match instance with
+    | None -> "Var_" ^ name
+    | Some x -> "Var" ^ name ^ " -> "^ (f x)
+
+  let resolve_name ({name; instance} : 'a t) (f : 'a -> string) =
     match instance with
     | None -> name
     | Some x -> f !x
 
-  let equal v1 v2 = String.equal v1.name v2.name
+  let equal (v1 : 'a t) (v2 : 'a t) = String.equal v1.name v2.name
 
-  let deep_copy v copy_f var_translation =
+  let deep_copy (v : 'a t) copy_f var_translation : 'a t =
     let instance =
       match v.instance with
       | None -> None
       | Some e -> copy_f e |> ref |> Some
     in
-    let new_v = {name = fresh () |> string_of_int; instance} in
+    let new_v : 'a t = {name = fresh () |> string_of_int; instance} in
     Hashtbl.set var_translation ~key:v.name ~data:(ref new_v);
     new_v
 
-  let reref_vars v tbl reref_f (var_wrap_f : 'a t ref -> 'b) deep_copy_f : 'b =
+  let serialise (t : 'a t) (resolve_instance : 'a -> 'a) (serialise_f : 'a -> 'b) : 'b serialisable =
+    match t.instance with
+    | None -> {name=t.name; instance=None}
+    | Some e -> {name=t.name; instance=( resolve_instance !e |> serialise_f |> Some)}
+
+  let deserialise ({name; instance} : 'b serialisable)
+      (f : 'b -> 'a t String.Table.t -> 'a) (tbl : 'a t String.Table.t) : 'a t=
+    match instance with
+    | None -> Hashtbl.find_or_add tbl name ~default:(fun () -> {name; instance=None})
+    | Some e -> let inst = f e tbl in {name; instance=Some (ref inst)}
+
+
+  let reref_vars (v : 'a t ref) (tbl : 'a t ref String.Table.t) reref_f (var_wrap_f : 'a t ref -> 'c) deep_copy_f : 'c =
     match !v.instance with
     | None ->
       (
@@ -62,8 +86,8 @@ module Var = struct
 end
 
 module Arithmetic_operand = struct
-  type serialisable =
-    | ArithmeticVarS of string
+  type 'b serialisable =
+    | ArithmeticVarS of 'b Var.serialisable
     | ArithmeticIntS of int
   [@@deriving bin_io]
 
@@ -71,16 +95,17 @@ module Arithmetic_operand = struct
     | ArithmeticVar of 'a Var.t ref
     | ArithmeticInt of int
 
-  let serialise t resolve_var_name : serialisable =
+  let serialise (t : 'a t) serialise_f : 'b serialisable =
     match t with
     | ArithmeticInt i -> ArithmeticIntS i
-    | ArithmeticVar v -> Var.resolve_name !v resolve_var_name |> ArithmeticVarS
+    | ArithmeticVar v -> Var.serialise !v (fun a -> a) serialise_f |> ArithmeticVarS
 
-  let deserialise s var_mapping : 'a t =
+  let deserialise s (var_mapping : 'a Var.t String.Table.t) : 'a t =
     match s with
     | ArithmeticIntS i -> ArithmeticInt i
-    | ArithmeticVarS v -> Hashtbl.find_or_add var_mapping v
-                           ~default:Var.create
+    | ArithmeticVarS v ->
+      Hashtbl.find_or_add var_mapping v.name
+                           ~default:(fun () -> Var.create_named v.name)
                          |> ref |> ArithmeticVar
 
   let to_string t (f : 'a -> string) =
@@ -88,9 +113,9 @@ module Arithmetic_operand = struct
     | ArithmeticVar v -> Var.to_string !v f
     | ArithmeticInt i -> Int.to_string i
 
-  let serialisable_to_string t =
+  let serialisable_to_string t to_string_f =
     match t with
-    | ArithmeticVarS v -> "Var_"^v
+    | ArithmeticVarS v -> "Var_"^(Var.serialisable_to_string v to_string_f)
     | ArithmeticIntS i -> Int.to_string i
 
   let deep_copy (t : 'a t) copy_f var_translation =
@@ -104,6 +129,13 @@ module Arithmetic_operand = struct
     | ArithmeticVar v -> (
         Var.reref_vars v tbl reref_f (fun v ->  ArithmeticVar v) copy_f
       )
+
+  let get_all_var_names (a : 'b serialisable)
+      (f : 'b -> string list -> string list) (acc : string list) : string list =
+    match a with
+    | ArithmeticVarS v -> Var.get_all_var_names v f acc
+    | ArithmeticIntS _ -> acc
+
 end
 
 
@@ -117,11 +149,12 @@ module Exp = struct
       | ArithmeticExp of Ast.arithmetic_operator * t Arithmetic_operand.t * t Arithmetic_operand.t
 
     type serialisable =
-      | VarExpS of string
+      | VarExpS of serialisable Var.serialisable
       | IntExpS of int
       | TermExpS of string * (serialisable list)
-      | ArithmeticExpS of Ast.arithmetic_operator *
-                         Arithmetic_operand.serialisable * Arithmetic_operand.serialisable
+      | ArithmeticExpS of Ast.arithmetic_operator
+                          * serialisable Arithmetic_operand.serialisable
+                          * serialisable Arithmetic_operand.serialisable
     [@@deriving bin_io]
 
     let operator_to_string (t : Ast.arithmetic_operator) =
@@ -130,7 +163,6 @@ module Exp = struct
       | MINUS -> " - "
       | MULT -> " * "
       | DIV -> " / "
-
 
     let rec to_string (t : t) =
       match t with
@@ -151,38 +183,72 @@ module Exp = struct
 
     let rec serialisable_to_string (t : serialisable) =
       match t with
-      | VarExpS v -> "Var_"^v
+      | VarExpS v -> "Var_"^(Var.serialisable_to_string v serialisable_to_string)
       | IntExpS i -> Int.to_string i
       | TermExpS (name, args) ->
         let arg_string = List.fold args ~init:"" ~f:(fun acc arg -> acc ^ (serialisable_to_string arg) ^ ", ") in
         name ^ "(" ^ arg_string ^ ")"
       | ArithmeticExpS (operator, op1, op2 ) ->
-        (Arithmetic_operand.serialisable_to_string op1 )
+        (Arithmetic_operand.serialisable_to_string op1 serialisable_to_string)
         ^ (operator_to_string operator)
-        ^ (Arithmetic_operand.serialisable_to_string op2 )
+        ^ (Arithmetic_operand.serialisable_to_string op2 serialisable_to_string)
+
+    let rec resolve_to_furthest_instance (e : t) : t =
+      match e with
+      | VarExp v -> (
+          match !v.instance with
+          | Some e -> (
+              match !e with
+              | VarExp _ -> resolve_to_furthest_instance !e
+              | _ -> !e
+            )
+          | None -> e
+        )
+      | _ -> e
 
     let rec serialise (t : t) : serialisable =
       match t with
-      | VarExp v -> Var.resolve_name !v resolve_var_name |> VarExpS
+      | VarExp v -> Var.serialise !v resolve_to_furthest_instance serialise |> VarExpS
       | IntExp i -> IntExpS i
       | TermExp (name, args) -> let args = List.map args ~f:(fun a -> serialise !a) in
         TermExpS (name, args)
       | ArithmeticExp (op, a1, a2) -> ArithmeticExpS (op,
-                                                     Arithmetic_operand.serialise a1 resolve_var_name,
-                                                     Arithmetic_operand.serialise a2 resolve_var_name
+                                                     Arithmetic_operand.serialise a1 serialise,
+                                                     Arithmetic_operand.serialise a2 serialise
                                                     )
 
     let rec deserialise (s : serialisable) var_mapping : t =
       match s with
-      | VarExpS v -> Hashtbl.find_or_add var_mapping v
-                              ~default:Var.create
-                            |> ref |> VarExp
+      | VarExpS v ->
+        let rec resolve_to_last_var (v : serialisable Var.serialisable) =
+          match v.instance with
+          | Some e ->
+            (match e with
+            | VarExpS v2 -> resolve_to_last_var v2
+            | _ -> v
+            )
+          | None -> v
+        in
+        Var.deserialise (resolve_to_last_var v) deserialise var_mapping |> ref |> VarExp
       | IntExpS i -> IntExp i
       | TermExpS (n, args) -> TermExp (n, List.map args ~f:(fun e -> deserialise e var_mapping |> ref))
       | ArithmeticExpS (op, a1, a2) -> ArithmeticExp (op,
                                                       Arithmetic_operand.deserialise a1 var_mapping,
                                                       Arithmetic_operand.deserialise a2 var_mapping
                                                      )
+
+    let rec get_all_var_names (e : serialisable) acc =
+      match e with
+      | VarExpS v -> Var.get_all_var_names v get_all_var_names acc
+      | IntExpS _ -> acc
+      | TermExpS (_, args) -> let acc2 = List.fold args ~init:[]
+                                  ~f:(fun acc2 arg -> get_all_var_names arg acc2)
+        in
+        acc2@acc
+      | ArithmeticExpS (_, op1, op2) ->
+        let acc1 = Arithmetic_operand.get_all_var_names op1 get_all_var_names [] in
+        let acc2 = Arithmetic_operand.get_all_var_names op2 get_all_var_names [] in
+        acc1@acc2@acc
 
     let rec deep_copy (e : t ref) var_translation : t =
       match !e with
@@ -277,6 +343,48 @@ module Dec = struct
 
 end
 
+module Clause = struct
+  type t = Exp.t ref * Exp.t ref list
+
+  type serialisable = Exp.serialisable * Exp.serialisable list [@@deriving bin_io]
+
+  let serialise (a,b) = (Exp.serialise !a, List.map b ~f:(fun e -> Exp.serialise !e))
+
+  let deserialise ((a,b) : serialisable) var_mapping : t =
+    (
+      Exp.deserialise a var_mapping |> ref,
+      List.map b ~f:(fun e -> Exp.deserialise e var_mapping |> ref)
+    )
+
+  let deep_copy (head, body) : t =
+    let head2 = Exp.deep_copy head (String.Table.create ()) |> ref in
+    let body2 = List.map body ~f:(fun elt -> Exp.deep_copy elt (String.Table.create ()) |> ref) in
+    (head2, body2)
+
+  let copy (head, body) : t =
+    let head2 = Exp.shallow_copy head in
+    let body2 = List.map body ~f:(fun elt -> Exp.shallow_copy elt) in
+    (head2, body2)
+
+  let to_string (head, body) =
+    (Exp.to_string !head)^" :- "^(List.to_string ~f:(fun g -> Exp.to_string !g) body )
+end
+
+module Job = struct
+  type t = {
+    goals : Exp.t ref list;
+    var_mapping : Exp.t Var.t String.Table.t
+  }
+
+  let deep_copy {goals; var_mapping} =
+    let var_translation = String.Table.create () in
+    let new_var_mapping = String.Table.map var_mapping ~f:(fun v ->
+        Var.deep_copy v (fun e -> Exp.deep_copy e var_translation) var_translation
+      )
+    in
+    let new_goals = List.map goals ~f:(fun e -> Exp.reref_vars !e var_translation |> ref) in
+    {goals=new_goals; var_mapping=new_var_mapping}
+end
 
 let rec get_furthest_instance (v : Exp.t Var.t ref) =
   match !v.instance with
@@ -345,35 +453,6 @@ let rec unify (t1_ref : Exp.t ref) (t2_ref : Exp.t ref) (trail : Trail.t) =
     )
 
 
-module Clause = struct
-  type t = Exp.t ref * Exp.t ref list
-
-  type serialisable = Exp.serialisable * Exp.serialisable list [@@deriving bin_io]
-
-  let serialise (a,b) = (Exp.serialise !a, List.map b ~f:(fun e -> Exp.serialise !e))
-
-  let deserialise ((a,b) : serialisable) var_mapping : t =
-    (
-      Exp.deserialise a var_mapping |> ref,
-      List.map b ~f:(fun e -> Exp.deserialise e var_mapping |> ref)
-    )
-
-  let deep_copy (head, body) : t =
-    let head2 = Exp.deep_copy head (String.Table.create ()) |> ref in
-    let body2 = List.map body ~f:(fun elt -> Exp.deep_copy elt (String.Table.create ()) |> ref) in
-    (head2, body2)
-
-  let copy (head, body) : t =
-    let head2 = Exp.shallow_copy head in
-    let body2 = List.map body ~f:(fun elt -> Exp.shallow_copy elt) in
-    (head2, body2)
-
-  let to_string (head, body) =
-    (Exp.to_string !head)^" :- "^(List.to_string ~f:(fun g -> Exp.to_string !g) body )
-end
-
-
-
 let realise_solution var_mapping =
   Hashtbl.fold var_mapping
     ~init:[]
@@ -411,30 +490,6 @@ let rec resolve (e : Exp.t) =
     )
   | _ -> e
 
-let rec resolve_to_var (e : Exp.t) =
-  match e with
-  | IntExp _ -> None
-  | VarExp v -> (match Var.get_instance !v with
-      | None -> Some v
-      | Some v -> resolve_to_var !v
-    )
-  | _ -> None
-
-module Job = struct
-  type t = {
-    goals : Exp.t ref list;
-    var_mapping : Exp.t Var.t String.Table.t
-  }
-
-  let deep_copy {goals; var_mapping} =
-    let var_translation = String.Table.create () in
-    let new_var_mapping = String.Table.map var_mapping ~f:(fun v ->
-        Var.deep_copy v (fun e -> Exp.deep_copy e var_translation) var_translation
-      )
-    in
-    let new_goals = List.map goals ~f:(fun e -> Exp.reref_vars !e var_translation |> ref) in
-    {goals=new_goals; var_mapping=new_var_mapping}
-end
 
 let arithmetic_convert (t : Ast.arithmetic_operand) (var_mapping : Exp.t Var.t String.Table.t) : Exp.t Arithmetic_operand.t =
   match t with
@@ -464,28 +519,19 @@ let rec convert (t : Ast.exp) (var_mapping : Exp.t Var.t String.Table.t) : Exp.t
     let new_op1 = arithmetic_convert op1 var_mapping in let new_op2 = arithmetic_convert op2 var_mapping in
     ArithmeticExp (op, new_op1, new_op2)
 
-let arithmetic_convert_serialisable (t : Ast.arithmetic_operand) var_mapping : Arithmetic_operand.serialisable =
+let arithmetic_convert_serialisable (t : Ast.arithmetic_operand)
+    (var_mapping : Exp.serialisable Var.serialisable String.Table.t)
+  : Exp.serialisable Arithmetic_operand.serialisable =
   match t with
-  | ArithmeticVar v -> String.Table.set var_mapping ~key:v ~data:v; ArithmeticVarS v
-    (* ( *)
-    (*   match Hashtbl.find var_mapping v with *)
-    (*   | Some v2 -> ArithmeticVar (ref v2) *)
-    (*   | None -> let new_var : Exp.t Var.t = Var.create () in *)
-    (*     Hashtbl.add_exn var_mapping ~key:v ~data:new_var; *)
-    (*     ArithmeticVar (ref new_var) *)
-    (* ) *)
+  | ArithmeticVar v -> String.Table.set var_mapping ~key:v ~data:({name=v; instance=None});
+    ArithmeticVarS {name=v; instance=None}
   | ArithmeticInt i -> ArithmeticIntS i
 
-let rec convert_serialisable (t : Ast.exp) var_mapping : Exp.serialisable =
+let rec convert_serialisable (t : Ast.exp) (var_mapping : Exp.serialisable Var.serialisable String.Table.t)
+  : Exp.serialisable =
   match t with
-  | VarExp v -> String.Table.set var_mapping ~key:v ~data:v; VarExpS v
-    (* ( *)
-    (*   match Hashtbl.find var_mapping v with *)
-    (*   | Some v2 -> VarExpS v2 *)
-    (*   | None -> let new_var = Var.create () in *)
-    (*     Hashtbl.add_exn var_mapping ~key:v ~data:new_var; *)
-    (*     VarExp (ref new_var) *)
-    (* ) *)
+  | VarExp v -> String.Table.set var_mapping ~key:v ~data:({name=v; instance=None});
+    VarExpS {name=v; instance=None}
   | IntExp i -> IntExpS i
   | TermExp (name, args) ->
     let new_args = List.map args ~f:(fun arg -> convert_serialisable arg var_mapping ) in
