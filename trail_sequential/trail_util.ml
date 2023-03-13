@@ -1,4 +1,5 @@
 open Core
+open Include
 
 let (fresh, reset, update) =
   let nxt = ref 0 in

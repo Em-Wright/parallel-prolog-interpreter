@@ -8,6 +8,15 @@
 )
 
 (executable
+ (public_name trail_interpreter)
+ (name trail_sequential)
+ (promote (until-clean))
+ (modules trail_sequential)
+ (libraries async core core_unix prolog_interpreter rpc_parallel trail_sequential)
+ (preprocess (pps ppx_jane))
+)
+
+(executable
  (public_name parallel_prolog_interpreter)
   (name parallel)
    (promote (until-clean))

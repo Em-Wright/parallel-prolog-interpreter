@@ -1,13 +1,11 @@
 open Core
-
-open Util
-
+open Include
 
 module Var = struct
   (* This 'a is used so that Var.t can reference Exp.t *)
   type 'a t = {name : string ; mutable instance : 'a ref option}
 
-  let create () = {name = fresh (); instance = None}
+  let create () = {name = Util.fresh (); instance = None}
 
   let name t = t.name
   let reset t = t.instance <- None

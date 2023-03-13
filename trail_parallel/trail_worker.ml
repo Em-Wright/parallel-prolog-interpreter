@@ -1,7 +1,7 @@
 open Core
 open Async
-open Prolog_interpreter.Trail_util
 open Include
+open Trail_util
 
 module Job = struct
   type t = {

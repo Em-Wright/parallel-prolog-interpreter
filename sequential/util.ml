@@ -43,6 +43,27 @@ let rec find_vars q  =
     )
 
 (*
+   find_vars_string:
+     * takes in:
+         q - a list of exp
+     * returns a list of all VarExp (and ArithmeticVar) as strings in the list
+*)
+let rec find_vars_string q  =
+  match q with
+  | [] -> []
+  | (x :: xs) -> (
+      match x with
+      | VarExp y -> y :: (find_vars_string xs)
+      | IntExp _ -> (find_vars_string xs)
+      | TermExp (_, el) -> (find_vars_string el) @ (find_vars_string xs)
+      | ArithmeticExp (_, e1, e2) ->
+        match e1,e2 with
+        | ArithmeticVar v1, ArithmeticVar v2 -> v1::(v2:: (find_vars_string xs))
+        | _, ArithmeticVar v2 -> v2:: (find_vars_string xs)
+        | ArithmeticVar v1, _ -> v1:: (find_vars_string xs)
+        | _ -> (find_vars_string xs)
+    )
+(*
    uniq:
      * takes in:
          l - an exp list

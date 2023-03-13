@@ -2,7 +2,7 @@
 (ocamllex lexer)
 (library
  (name prolog_interpreter)
- (modules (:standard parser) lexer main util ast trail_util )
+ (modules (:standard parser) lexer main util ast interface )
  (libraries core ounit2 menhirLib )
  (preprocess (pps ppx_jane))
 )

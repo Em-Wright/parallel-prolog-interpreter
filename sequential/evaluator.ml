@@ -17,13 +17,25 @@ open Util
          - otherwise, each element is a list of substitutions for one solution
            to the query with the given db
 *)
-let rec eval_query (q, db, env) =
+let rec eval_query (q, db, env) orig_vars =
     match q with
     | [] -> (
         (* no more subgoals to prove so finished *)
         ([env], false)
     )
     | (g1 :: gl) ->
+      (* TODO - get all vars in the goals, add to orig_vars, filter out any elts of
+      the environment which aren't in this list
+      *)
+      let vars_set_string = String.Set.of_list (find_vars_string (g1::gl)) |> String.Set.union orig_vars
+      in
+      let env =
+        List.filter env ~f:(fun (v, _) ->
+            match v with
+            | VarExp elt -> String.Set.exists vars_set_string ~f:(fun a -> String.equal elt a)
+            | _ -> false
+          )
+      in
       (  (* have at least one more subgoal (g1) to prove *)
         match g1 with
         (* if goal is the true predicate *)
@@ -32,10 +44,10 @@ let rec eval_query (q, db, env) =
               gl,
               db,
               env
-          )
+          ) orig_vars
         )
         | TermExp("cut", []) -> (
-            let (res, _) = eval_query ( gl, db, env ) in
+            let (res, _) = eval_query ( gl, db, env ) orig_vars in
             (res, true)
           )
         (* if the goal is the 'equals' predicate *)
@@ -49,7 +61,7 @@ let rec eval_query (q, db, env) =
                       sub_lift_goals s gl,
                       db,
                       env2
-                    ))
+                    ) orig_vars )
                 | None -> ([], false)
               )
             | None -> ([], false)
@@ -63,15 +75,15 @@ let rec eval_query (q, db, env) =
             | Some s -> (
                 match unify (s@env) with
                 | Some _ -> ([], false)
-                | None -> eval_query (gl, db, env)
+                | None -> eval_query (gl, db, env) orig_vars
               )
-            | None -> eval_query (gl, db, env)
+            | None -> eval_query (gl, db, env) orig_vars
           )
         | TermExp("greater_than", [lhs; rhs]) -> (
           match lhs, rhs with
           | IntExp i1, IntExp i2 ->
             if i1 > i2 then
-              eval_query (gl, db, env)
+              eval_query (gl, db, env) orig_vars
             else
               ([], false)
           | _ ->  ([], false) (* arguments insufficiently instantiated *)
@@ -80,7 +92,7 @@ let rec eval_query (q, db, env) =
             match lhs, rhs with
             | IntExp i1, IntExp i2 ->
               if i1 >= i2 then
-                eval_query (gl, db, env)
+                eval_query (gl, db, env) orig_vars
               else
                 ([], false)
             | _ ->  ([], false) (* arguments insufficiently instantiated *)
@@ -89,7 +101,7 @@ let rec eval_query (q, db, env) =
           match lhs, rhs with
           | IntExp i1, IntExp i2 ->
             if i1 < i2 then
-              eval_query (gl, db, env)
+              eval_query (gl, db, env) orig_vars
             else
               ([], false)
           | _ ->  ([], false) (* arguments insufficiently instantiated *)
@@ -98,7 +110,7 @@ let rec eval_query (q, db, env) =
             match lhs, rhs with
             | IntExp i1, IntExp i2 ->
               if i1 <= i2 then
-                eval_query (gl, db, env)
+                eval_query (gl, db, env) orig_vars
               else
                 ([], false)
             | _ ->  ([], false) (* arguments insufficiently instantiated *)
@@ -119,11 +131,11 @@ let rec eval_query (q, db, env) =
                                   sub_lift_goals [(lhs, IntExp result)] gl,
                                   db,
                                   env2
-                                )
+                                ) orig_vars
                               | None ->  ([], false)
                             )
                       | IntExp i ->
-                        if i = result then eval_query (gl, db, env) else  ([], false)
+                        if i = result then eval_query (gl, db, env) orig_vars else  ([], false)
                       | _ ->  ([], false)
                     )
                   | _ ->  ([], false)
@@ -137,11 +149,11 @@ let rec eval_query (q, db, env) =
                             sub_lift_goals [(lhs, rhs)] gl,
                             db,
                             env2
-                          )
+                          ) orig_vars
                         | None ->  ([], false)
                       )
                 | IntExp i -> (
-                    if i = result then eval_query (gl, db, env) else ([], false)
+                    if i = result then eval_query (gl, db, env) orig_vars else ([], false)
                   )
                 | _ -> ([], false)
               )
@@ -175,7 +187,7 @@ let rec eval_query (q, db, env) =
                                         sub_lift_goals s gl,
                                         db,
                                         env2
-                                     ))
+                                     ) orig_vars )
                                   in
                                   if cut then Stop (res @ r, false)
                                   else Continue (res @ r, false)
@@ -191,7 +203,7 @@ let rec eval_query (q, db, env) =
                                         (sub_lift_goals s b) @ (sub_lift_goals s gl),
                                         db,
                                         env2
-                                      ))
+                                      ) orig_vars)
                                     in
                                     if cut then Stop (res @ r, false)
                                     else Continue (res @ r, false)
@@ -209,7 +221,7 @@ let rec eval_query (q, db, env) =
                                     (sub_lift_goals s b) @ (sub_lift_goals s gl),
                                     db,
                                     env2
-                                  ))
+                                  ) orig_vars)
                                 in
                                 if cut then Stop (res @ r, false)
                                 else Continue (res @ r, false)
@@ -226,7 +238,7 @@ let rec eval_query (q, db, env) =
                 |  _ -> Continue (r, false)
           )) db ~init:([], false) )
         (* subgoal isn't a TermExp (i.e. is a VarExp or a ConstExp) *)
-        | _ -> eval_query (gl, db, env)
+        | _ -> eval_query (gl, db, env) orig_vars
     )
 
 
@@ -242,5 +254,6 @@ let command =
        in
        fun () ->
          Interface.main filename ~eval_function:(fun db b ->
-             let (res,_) = eval_query (b, db, []) in res )
+             let orig_vars = find_vars_string b |> String.Set.of_list in
+             let (res,_) = eval_query (b, db, []) orig_vars in res )
     ]

@@ -1,0 +1,6 @@
+(library
+ (name trail_sequential)
+ (modules main trail_util trail_evaluator trail_stack_evaluator include )
+ (libraries core ounit2 menhirLib prolog_interpreter )
+ (preprocess (pps ppx_jane))
+)

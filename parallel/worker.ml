@@ -1,8 +1,8 @@
 open Core
 open Async
-open Prolog_interpreter.Ast
-open Prolog_interpreter.Util
 open Include
+open Ast
+open Util
 
 let (fresh, reset, update) =
   let nxt = ref 0 in
@@ -43,8 +43,8 @@ module Job_and_nxt = struct
   type t = Job.t * int [@@deriving bin_io]
 end
 
-module Job_and_bool = struct
-  type t = Job.t * int * bool [@@deriving bin_io]
+module Job_and_bool_and_vars = struct
+  type t = Job.t * int * bool * String.Set.t [@@deriving bin_io]
 end
 
 module Dec = struct
@@ -241,7 +241,7 @@ module T = struct
      the worker_state.
      It returns when it no longer has any work on its stack.
   *)
-  let main (worker_state : Worker_state.t) send_initial_jobs_bool =
+  let main (worker_state : Worker_state.t) send_initial_jobs_bool orig_vars =
     (* Clear the pipe of any previous requests for work which
     are no longer relevant *)
     Pipe.clear worker_state.reader;
@@ -253,6 +253,15 @@ module T = struct
           ( eval goals env worker_state.db path) in
         List.iter jobs
           ~f:( fun (goals, env, path2) ->
+              let vars_set_string = String.Set.of_list (find_vars_string goals) |> String.Set.union orig_vars
+              in
+              let env =
+                List.filter env ~f:(fun (v, _) ->
+                    match v with
+                    | VarExp elt -> String.Set.exists vars_set_string ~f:(fun a -> String.equal elt a)
+                    | _ -> false
+                  )
+              in
               Deque.enqueue_back worker_state.q {goals; env; path=path2} );
         []
       )
@@ -297,6 +306,15 @@ module T = struct
             ( eval goals env worker_state.db path) in
           List.iter jobs
             ~f:( fun (goals, env, path2) ->
+                let vars_set_string = String.Set.of_list (find_vars_string goals) |> String.Set.union orig_vars
+                in
+                let env =
+                  List.filter env ~f:(fun (v, _) ->
+                      match v with
+                      | VarExp elt -> String.Set.exists vars_set_string ~f:(fun a -> String.equal elt a)
+                      | _ -> false
+                    )
+                in
                 Deque.enqueue_back worker_state.q {goals; env; path=path2} );
           main_inner results
         )
@@ -311,7 +329,7 @@ module T = struct
     {q; index; db = init_db; reader = Pipe.empty (); writer = temp_writer}
 
   type 'worker functions = {
-    eval_query : ('worker, Job_and_bool.t, unit) Rpc_parallel_edit.Function.t;
+    eval_query : ('worker, Job_and_bool_and_vars.t, unit) Rpc_parallel_edit.Function.t;
     update_db : ('worker, dec, unit) Rpc_parallel_edit.Function.t;
     worker_to_toplevel_pipe : ('worker, unit, Worker_to_toplevel.t Pipe.Reader.t) Rpc_parallel_edit.Function.t;
     toplevel_to_worker_pipe : ('worker, unit * unit Pipe.Reader.t, unit) Rpc_parallel_edit.Function.t
@@ -322,10 +340,10 @@ module T = struct
        with type worker_state := Worker_state.t
         and type connection_state := Connection_state.t) =
   struct
-    let eval_query_impl ~worker_state ~conn_state:() (job, highest_var, send_initial_jobs_bool) =
+    let eval_query_impl ~worker_state ~conn_state:() (job, highest_var, send_initial_jobs_bool, orig_vars) =
       update highest_var;
       Deque.enqueue_back (Worker_state.q worker_state) job;
-      main worker_state send_initial_jobs_bool
+      main worker_state send_initial_jobs_bool orig_vars
     ;;
 
     let update_db_impl ~worker_state ~conn_state:() d =
@@ -343,7 +361,7 @@ module T = struct
     let eval_query =
       C.create_rpc
         ~f:eval_query_impl
-        ~bin_input:(Job_and_bool.bin_t)
+        ~bin_input:(Job_and_bool_and_vars.bin_t)
         ~bin_output:(Unit.bin_t)
         ()
 
@@ -447,6 +465,7 @@ let add_dec_to_db dec workers_info =
    aggregated results.
 *)
 let eval_query b worker_info_list =
+  let orig_vars = String.Set.of_list (find_vars_string b) in
   let num_workers = List.length worker_info_list in
   let have_work__requested_work = Hashtbl.of_alist_exn (module Int)
       (List.init num_workers ~f:(fun i -> (i, (false, false)))) in
@@ -472,7 +491,7 @@ let eval_query b worker_info_list =
         Connection.run_exn
           (Worker_info.conn (List.nth_exn worker_info_list index))
           ~f:(functions.eval_query)
-          ~arg:(job, n, b)
+          ~arg:(job, n, b, orig_vars)
       );
     update_have_work index true
   in
