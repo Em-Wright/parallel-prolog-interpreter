@@ -137,6 +137,15 @@ let sub_lift_goals sub gl =
     List.map ~f:(fun g1 -> sub_lift_goal sub g1) gl
 
 (*
+   sub_lift_goals_cut:
+     * takes in:
+         sub - a list of substitutions for variables
+         gl - a list of (goal, cut) pairs
+     * returns the list of goals with the substitutions applied to each goal
+*)
+let sub_lift_goals_cut sub gl =
+  List.map ~f:(fun (g1, c) -> sub_lift_goal sub g1, c) gl
+(*
    rename_vars_in_dec:
      * takes in:
          d - a dec type

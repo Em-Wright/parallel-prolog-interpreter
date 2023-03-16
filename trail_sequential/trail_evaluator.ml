@@ -290,21 +290,21 @@ let rec resolve (e : Exp.t) =
 
 let rec eval_query q db (trail : Trail.t) var_mapping =
   match q with
-  | [] -> [solution_to_string var_mapping], false
-  | g1::gl ->
+  | [] -> [solution_to_string var_mapping], []
+  | (g1, depth)::gl ->
       (
         match !g1 with
         (* if goal is the true predicate *)
         | Exp.TermExp("true", []) -> eval_query gl db trail var_mapping
-        | TermExp("cut", []) -> let res, _ = eval_query gl db trail var_mapping in
-          (res, true)
+        | TermExp("cut", []) -> let res, cut = eval_query gl db trail var_mapping in
+          (res, (depth-1)::cut)
         | TermExp("equals", [lhs; rhs]) -> (
             (* check if the lhs and rhs can unify *)
             let t = Trail.mark trail in
             let res = 
               if unify lhs rhs trail then
                 eval_query gl db trail var_mapping
-              else ([], false)
+              else ([], [])
             in
             Trail.undo trail t;
             res
@@ -319,7 +319,7 @@ let rec eval_query q db (trail : Trail.t) var_mapping =
               if not (unify lhs rhs trail) then (
                 Trail.undo trail t;
                 eval_query gl db trail var_mapping;
-              ) else ([], false)
+              ) else ([], [])
             in
             Trail.undo trail t;
             res
@@ -329,32 +329,32 @@ let rec eval_query q db (trail : Trail.t) var_mapping =
           | IntExp i1, IntExp i2 ->
             if i1 > i2 then
               eval_query gl db trail var_mapping
-            else [], false
-          | _ -> [], false (* arguments insufficiently instantiated *)
+            else [], []
+          | _ -> [], [] (* arguments insufficiently instantiated *)
         )
         | TermExp("greater_than_or_eq", [lhs; rhs]) -> (
             match (resolve !lhs), (resolve !rhs) with
             | IntExp i1, IntExp i2 ->
               if i1 >= i2 then
                 eval_query gl db trail var_mapping
-              else [], false
-            | _ -> [], false (* arguments insufficiently instantiated *)
+              else [], []
+            | _ -> [], [] (* arguments insufficiently instantiated *)
           )
         | TermExp("less_than", [lhs; rhs]) -> (
             match (resolve !lhs), (resolve !rhs) with
             | IntExp i1, IntExp i2 ->
               if i1 < i2 then
                 eval_query gl db trail var_mapping
-              else [], false
-            | _ -> [], false (* arguments insufficiently instantiated *)
+              else [], []
+            | _ -> [], [] (* arguments insufficiently instantiated *)
           )
         | TermExp("less_than_or_eq", [lhs; rhs]) -> (
             match (resolve !lhs), (resolve !rhs) with
             | IntExp i1, IntExp i2 ->
               if i1 <= i2 then
                 eval_query gl db trail var_mapping
-              else [], false
-            | _ -> [], false (* arguments insufficiently instantiated *)
+              else [], []
+            | _ -> [], [] (* arguments insufficiently instantiated *)
           )
         | TermExp("is", [lhs; rhs]) -> (
             (* evaluate the arithmetic expressions with current substitutions, then check if it is
@@ -369,44 +369,51 @@ let rec eval_query q db (trail : Trail.t) var_mapping =
                     (
                       match !lhs with
                       | VarExp _ -> if unify lhs (ref (Exp.IntExp result)) trail then
-                          eval_query gl db trail var_mapping else [], false
-                      | IntExp i -> if i = result then eval_query gl db trail var_mapping else [], false
-                      | _ -> [], false
+                          eval_query gl db trail var_mapping else [], []
+                      | IntExp i -> if i = result then eval_query gl db trail var_mapping else [], []
+                      | _ -> [], []
                     ) in Trail.undo trail t; res
                   )
-                | _ -> [], false
+                | _ -> [], []
               )
             | IntExp result -> (
                 let t = Trail.mark trail in
                  let res = (
                   match !lhs with
                   | VarExp _ -> if unify lhs (ref (Exp.IntExp result)) trail then
-                      eval_query gl db trail var_mapping else [], false
-                  | IntExp i -> if i = result then eval_query gl db trail var_mapping else [], false
-                  | _ -> [], false
+                      eval_query gl db trail var_mapping else [], []
+                  | IntExp i -> if i = result then eval_query gl db trail var_mapping else [], []
+                  | _ -> [], []
                 )
                 in Trail.undo trail t; res
               )
-            | _ -> [], false
+            | _ -> [], []
           )
         | TermExp(_,_) -> (
             let db_copy = List.map db ~f:(fun clause -> Clause.copy clause trail) in
-            let rec loop db_copy res =
+            let rec loop db_copy (res, acc_cuts) =
               match db_copy with
-              | [] -> res
+              | [] -> (res, acc_cuts)
               | c::dbs -> (let t = Trail.mark trail in
                            let (head, body) = Clause.copy c trail in
                            Trail.undo trail t;
                            let res2, cut =
                              if unify head g1 trail then (
-                               eval_query (body@gl) db trail var_mapping
-                             ) else [], false in
+                               let body2 = List.zip_exn body (List.init (List.length body) ~f:(fun _ -> (depth+1))) in
+                               eval_query (body2@gl) db trail var_mapping
+                             ) else [], [] in
                            Trail.undo trail t;
-                           if cut then res2@res else
-                             loop dbs (res2@res)
+                           (
+                             match cut with
+                             | d::cuts -> if Int.equal d depth then (res2 @ res, cuts@acc_cuts)
+                               else (
+                                 if d > depth then print_endline "something has gone terribly wrong";
+                                 loop dbs (res2 @ res, cut@acc_cuts))
+                             | [] -> loop dbs(res2 @ res, acc_cuts)
+                           )
                           )
             in
-            loop db_copy [] , false)
+            loop db_copy ([],[]) )
         | _ -> eval_query gl db trail var_mapping
       )
 
@@ -464,7 +471,7 @@ let command =
                     )
               in
               let var_mapping = String.Table.create () in
-              let b_converted : Exp.t ref list = List.map b ~f:(fun e -> convert e var_mapping |> ref ) in
+              let b_converted : (Exp.t ref * int) list = List.map b ~f:(fun e -> convert e var_mapping |> ref , 0) in
               let trail = Stack.create () in
               let res, _ = eval_query b_converted db_converted trail var_mapping in
               List.iter res ~f:print_endline;

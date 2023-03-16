@@ -33,9 +33,9 @@ let rename_vars_in_dec d =
 
 module Job = struct
   type t = {
-    goals : exp list;
+    goals : (exp * int) list;
     env : ((exp * exp) list);
-    path : int list
+    path : (int*int) list
   } [@@deriving bin_io, fields]
 end
 
@@ -52,7 +52,7 @@ module Dec = struct
 end
 
 module Results = struct
-  type t = ((exp * exp) list * int list )list [@@deriving bin_io]
+  type t = ((exp * exp) list * (int*int) list )list [@@deriving bin_io]
 
   let reverse_path_order t : t =
     List.map t ~f:( fun (env, path) -> (env, List.rev path))
@@ -62,8 +62,30 @@ module Worker_to_toplevel = struct
   type t =
     Results of Results.t
     | Job of Job_and_nxt.t
+    | Cut of (int*int) list
   [@@deriving bin_io]
 end
+
+module Toplevel_to_worker = struct
+  type t =
+    Work_request
+    | Cut of (int*int) list
+  [@@deriving bin_io]
+end
+
+let remove_due_to_cut path cut_path =
+  let rec loop p cp =
+    match p, cp with
+    | (x,dx)::_, (y, dy)::[] -> if x > y && dx=dy then true else false
+    | (x,dx)::xs, (y, dy)::ys -> if x = y && dx=dy then loop xs ys else false
+    | _,_ -> false
+  in
+  loop path (List.rev cut_path)
+
+let rec truncate path depth =
+  match path with
+  | (_, d)::p -> if d > depth then truncate p depth else  path
+  | [] -> []
 
 module T = struct
 
@@ -75,7 +97,7 @@ module T = struct
       q : Job.t Deque.t;
       index : int;
       mutable db : dec list;
-      mutable reader : unit Pipe.Reader.t;
+      mutable reader : Toplevel_to_worker.t Pipe.Reader.t;
       mutable writer : Worker_to_toplevel.t Pipe.Writer.t
     } [@@deriving fields]
   end
@@ -99,49 +121,53 @@ module T = struct
   *)
   let eval gs env db path =
     match gs with
-    | g1::gl -> (
+    | (g1, depth)::gl -> (
         (* we have at least one more subgoal (g1) to prove in this job *)
         match g1 with
-        | TermExp("true", []) -> [ (gl, env, path)]
+        | TermExp ("false", []) -> [], None
+        | TermExp("true", []) -> [ (gl, env, path)], None
+        | TermExp("cut", []) ->
+          let truncated = truncate path (depth ) in
+          [(gl, env, path)], Some truncated
         | TermExp("equals", [lhs; rhs]) -> (
             match unify [(lhs, rhs)] with
             | Some s -> (
                 match unify (s@env) with
-                | Some env2 -> [(sub_lift_goals s gl, env2, path)]
-                | None -> []
+                | Some env2 -> [(sub_lift_goals_cut s gl, env2, path)], None
+                | None -> [], None
               )
-            | None -> []
+            | None -> [], None
           )
         | TermExp("not_equal", [lhs;rhs]) -> (
             match unify [(lhs, rhs)] with
             | Some s -> (
                 match unify (s@env) with
-                | Some _ -> []
-                | None -> [(gl, env, path)]
+                | Some _ -> [], None
+                | None -> [(gl, env, path)], None
               )
-            | None -> [ (gl, env, path) ]
+            | None -> [ (gl, env, path) ], None
           )
         | TermExp("greater_than", [lhs; rhs]) -> (
             match lhs, rhs with
-            | IntExp i1, IntExp i2 -> if i1 > i2 then [(gl, env, path)] else []
-            | _ -> [] (* arguments insufficiently instantiated *)
+            | IntExp i1, IntExp i2 -> if i1 > i2 then [(gl, env, path)], None else [], None
+            | _ -> [], None (* arguments insufficiently instantiated *)
           )
         | TermExp("less_than", [lhs; rhs]) ->
           (
             match lhs, rhs with
-            | IntExp i1, IntExp i2 -> if i1 < i2 then [(gl, env, path)] else []
-            | _ -> [] (* arguments insufficiently instantiated *)
+            | IntExp i1, IntExp i2 -> if i1 < i2 then [(gl, env, path)], None else [], None
+            | _ -> [], None (* arguments insufficiently instantiated *)
           )
         | TermExp("greater_than_or_eq", [lhs; rhs]) -> (
             match lhs, rhs with
-            | IntExp i1, IntExp i2 -> if i1 >= i2 then [(gl, env, path)] else []
-            | _ -> [] (* arguments insufficiently instantiated *)
+            | IntExp i1, IntExp i2 -> if i1 >= i2 then [(gl, env, path)], None else [], None
+            | _ -> [], None (* arguments insufficiently instantiated *)
           )
         | TermExp("less_than_or_eq", [lhs; rhs]) ->
           (
             match lhs, rhs with
-            | IntExp i1, IntExp i2 -> if i1 <= i2 then [(gl, env, path)] else []
-            | _ -> [] (* arguments insufficiently instantiated *)
+            | IntExp i1, IntExp i2 -> if i1 <= i2 then [(gl, env, path)], None else [],None
+            | _ -> [], None (* arguments insufficiently instantiated *)
           )
         | TermExp("is", [lhs; rhs]) -> (
             (* evaluate the arithmetic expressions with current substitutions, then check if it is
@@ -156,16 +182,16 @@ module T = struct
                           match unify ((lhs, IntExp result)::env) with
                           | Some env2 ->
                             [ (
-                              sub_lift_goals [(lhs, IntExp result)] gl,
+                              sub_lift_goals_cut [(lhs, IntExp result)] gl,
                               env2,
                               path
-                            )]
-                          | None -> []
+                            )], None
+                          | None -> [], None
                         )
-                      | IntExp i -> if i = result then [(gl, env, path)] else []
-                      | _ -> []
+                      | IntExp i -> if i = result then [(gl, env, path)], None else [], None
+                      | _ -> [], None
                     )
-                  | _ -> []
+                  | _ -> [], None
               )
             | IntExp result -> (
                 match lhs with
@@ -173,16 +199,16 @@ module T = struct
                   ( match unify ((lhs, rhs)::env) with
                     | Some env2 ->
                       [(
-                        sub_lift_goals [(lhs, rhs)] gl,
+                        sub_lift_goals_cut [(lhs, rhs)] gl,
                         env2,
                         path
-                      )]
-                    | None -> []
+                      )], None
+                    | None -> [], None
                   )
-                | IntExp i -> if i = result then [(gl, env, path)] else []
-                | _ -> []
+                | IntExp i -> if i = result then [(gl, env, path)], None else [], None
+                | _ -> [], None
               )
-            | _ -> []
+            | _ -> [], None
           )
         (* if goal is some other predicate *)
         | TermExp(_,_) -> (
@@ -203,22 +229,24 @@ module T = struct
                                 *)
                                 | ((TermExp ("true", _)) :: _) ->
                                   (
-                                    sub_lift_goals s gl,
+                                    sub_lift_goals_cut s gl,
                                     env2,
-                                    i::path
+                                    (i, depth+1)::path
                                   )::acc
                                 | _ ->
+                                  let body2 = sub_lift_goals s body |> List.map ~f:(fun a -> a, (depth+1)) in
                                   (
-                                    (sub_lift_goals s body) @ (sub_lift_goals s gl),
+                                    body2 @ (sub_lift_goals_cut s gl),
                                     env2,
-                                    i::path
+                                    (i, depth + 1)::path
                                   )::acc
                               )
                               else
+                                let body2 = sub_lift_goals s body |> List.map ~f:(fun a -> a, (depth+1)) in
                                 (
-                                  (sub_lift_goals s body) @ (sub_lift_goals s gl),
+                                  body2 @ (sub_lift_goals_cut s gl),
                                   env2,
-                                  i::path
+                                  (i, depth+1)::path
                                 )::acc
                             )
                           | _ -> acc
@@ -227,11 +255,11 @@ module T = struct
                       | _ -> acc
                     )
                   |  _ -> acc
-                ))
+                )), None
         (* subgoal g1 isn't a TermExp *)
-        | _ -> [(gl, env, path)]
+        | _ -> [(gl, env, path)], None
       )
-    | [] -> []
+    | [] -> [], None
   ;;
 
   (* main takes the worker state and returns unit
@@ -245,24 +273,37 @@ module T = struct
     (* Clear the pipe of any previous requests for work which
     are no longer relevant *)
     Pipe.clear worker_state.reader;
+    let handle_job (goals, env, path2) =
+      let goals2, _ = List.unzip goals in
+      let vars_set_string = String.Set.of_list (find_vars_string goals2) |> String.Set.union orig_vars
+      in
+      let env =
+        List.filter env ~f:(fun (v, _) ->
+            match v with
+            | VarExp elt -> String.Set.exists vars_set_string ~f:(fun a -> String.equal elt a)
+            | _ -> false
+          )
+      in
+      Deque.enqueue_back worker_state.q {goals; env; path=path2}
+    in
     let init_results = match Deque.dequeue_back worker_state.q with
     | None -> []
     | Some {goals =[]; env; path} -> [(env, path)]
     | Some {goals; env; path} -> (
-        let jobs =
+        let jobs, cut =
           ( eval goals env worker_state.db path) in
-        List.iter jobs
-          ~f:( fun (goals, env, path2) ->
-              let vars_set_string = String.Set.of_list (find_vars_string goals) |> String.Set.union orig_vars
-              in
-              let env =
-                List.filter env ~f:(fun (v, _) ->
-                    match v with
-                    | VarExp elt -> String.Set.exists vars_set_string ~f:(fun a -> String.equal elt a)
-                    | _ -> false
-                  )
-              in
-              Deque.enqueue_back worker_state.q {goals; env; path=path2} );
+        (
+          match cut with
+          | Some cut -> Pipe.write_without_pushback worker_state.writer (Cut cut);
+            List.iter jobs
+              ~f:( fun (goals, env, path2) ->
+                  if not (remove_due_to_cut path2 cut) then (
+                    handle_job (goals, env, path2)
+                ))
+          | None ->
+            List.iter jobs
+              ~f:( fun (goals, env, path2) -> handle_job (goals, env, path2))
+        );
         []
       )
     in
@@ -278,7 +319,7 @@ module T = struct
     let%bind _ =
     if send_initial_jobs_bool then loop_send_jobs () else Deferred.unit
         in
-    let rec main_inner (results : ((exp * exp) list * int list) list) =
+    let rec main_inner (results : ((exp * exp) list * (int*int) list) list) =
       let%bind _check_for_requests =
         (* NOTE - if you ever use a `read' function to check if there's
            anything in the pipe, make sure to use read_now - `read' waits
@@ -286,7 +327,14 @@ module T = struct
         *)
           match Pipe.peek worker_state.reader with
           | None -> Deferred.unit
-          | Some () -> (
+          | Some (Cut cut) -> 
+            Deque.iteri worker_state.q
+              ~f:(fun i job ->
+                  if remove_due_to_cut job.path cut then
+                    Deque.set_exn worker_state.q i ({job with goals=[TermExp("false", []), 0]})
+                );
+            Deferred.unit
+          | Some Work_request -> (
               (* We only give out work if we have at least 2 jobs on our stack.
               Otherwise, we would give away all our work, and have to ask the
               toplevel for more *)
@@ -302,20 +350,20 @@ module T = struct
       | None -> Pipe.write worker_state.writer (Results (Results.reverse_path_order results))
       | Some {goals =[]; env; path} -> main_inner ((env, path)::results)
       | Some {goals; env; path} -> (
-          let jobs =
+          let jobs, cut =
             ( eval goals env worker_state.db path) in
-          List.iter jobs
-            ~f:( fun (goals, env, path2) ->
-                let vars_set_string = String.Set.of_list (find_vars_string goals) |> String.Set.union orig_vars
-                in
-                let env =
-                  List.filter env ~f:(fun (v, _) ->
-                      match v with
-                      | VarExp elt -> String.Set.exists vars_set_string ~f:(fun a -> String.equal elt a)
-                      | _ -> false
-                    )
-                in
-                Deque.enqueue_back worker_state.q {goals; env; path=path2} );
+          (
+            match cut with
+            | Some cut -> Pipe.write_without_pushback worker_state.writer (Cut cut);
+              List.iter jobs
+                ~f:( fun (goals, env, path2) ->
+                    if not (remove_due_to_cut path2 cut) then (
+                      handle_job (goals, env, path2)
+                    ))
+            | None ->
+              List.iter jobs
+                ~f:( fun (goals, env, path2) -> handle_job (goals, env, path2))
+          );
           main_inner results
         )
     in
@@ -332,7 +380,7 @@ module T = struct
     eval_query : ('worker, Job_and_bool_and_vars.t, unit) Rpc_parallel_edit.Function.t;
     update_db : ('worker, dec, unit) Rpc_parallel_edit.Function.t;
     worker_to_toplevel_pipe : ('worker, unit, Worker_to_toplevel.t Pipe.Reader.t) Rpc_parallel_edit.Function.t;
-    toplevel_to_worker_pipe : ('worker, unit * unit Pipe.Reader.t, unit) Rpc_parallel_edit.Function.t
+    toplevel_to_worker_pipe : ('worker, unit * Toplevel_to_worker.t Pipe.Reader.t, unit) Rpc_parallel_edit.Function.t
   }
 
   module Functions
@@ -347,7 +395,7 @@ module T = struct
     ;;
 
     let update_db_impl ~worker_state ~conn_state:() d =
-      Worker_state.set_db worker_state (d::worker_state.db) |> return
+      Worker_state.set_db worker_state (worker_state.db @ [d]) |> return
     ;;
 
     let worker_to_toplevel_pipe_impl ~worker_state ~conn_state:() _ =
@@ -383,7 +431,7 @@ module T = struct
       C.create_reverse_pipe
         ~f:toplevel_to_worker_pipe_impl
         ~bin_query:Unit.bin_t
-        ~bin_update:Unit.bin_t
+        ~bin_update:Toplevel_to_worker.bin_t
         ~bin_response:Unit.bin_t
         ()
 
@@ -400,7 +448,7 @@ module Worker_info = struct
   type t = {
     conn : Connection.t;
     reader : Worker_to_toplevel.t Pipe.Reader.t;
-    writer : unit Pipe.Writer.t
+    writer : Toplevel_to_worker.t Pipe.Writer.t
   } [@@deriving fields]
 end
 
@@ -496,15 +544,23 @@ let eval_query b worker_info_list =
     update_have_work index true
   in
   let request_work index =
-    Pipe.write_without_pushback  (List.nth_exn worker_info_list index).writer ();
+    Pipe.write_without_pushback  (List.nth_exn worker_info_list index).writer Work_request;
     update_requested_work index true
+  in
+  let send_cut cut index_of_sender =
+    Deferred.List.iteri worker_info_list ~f:(fun index {conn=_; reader=_; writer} ->
+        if not (Int.equal index_of_sender index) then Pipe.write writer cut else Deferred.unit
+      )
   in
 
   let spare_jobs = Queue.create () in
   let accumulated_results = ref [] in
+  let accumulated_cuts = ref [] in
 
   (* start by giving work to the first worker, then requesting work if we have more than 1 worker *)
-  give_work 0 ({goals = b; env = []; path = []}, 0, true);
+  let req_init_work = if num_workers > 1 then true else false in
+  let b = List.map b ~f:(fun x -> (x,0)) in
+  give_work 0 ({goals = b; env = []; path = []}, 0, req_init_work);
   if num_workers > 1 then
        request_work 0;
 
@@ -520,6 +576,9 @@ let eval_query b worker_info_list =
         | `Ok (Results results) ->
           Hashtbl.set have_work__requested_work ~key:index ~data:(false, false);
           accumulated_results := (results@(!accumulated_results))
+        | `Ok (Cut cut) ->
+          don't_wait_for (send_cut (Cut cut) index);
+          accumulated_cuts := ([cut]@(!accumulated_cuts))
       );
     (* give new_jobs to any idle workers and update have_work accordingly *)
     let idle = Hashtbl.filter have_work__requested_work ~f:(fun (b, _) -> not b) in
@@ -547,7 +606,7 @@ let eval_query b worker_info_list =
     if (Hashtbl.count have_work__requested_work ~f:(fun (have_work, _) -> have_work)) = 0 &&
        (Queue.length spare_jobs ) = 0
     then
-      return accumulated_results
+      return (accumulated_results, accumulated_cuts)
     else
       (
         let%bind _ = Clock.after (Time.Span.of_ns 10.0) in
@@ -590,16 +649,20 @@ let main filename num_workers =
                         (* find num of VarExps in query *)
                         let orig_vars_num = List.length orig_vars in
                         (* evaluate query *)
-                        let%bind res = eval_query b workers_info in
-                        let sorted_res = List.sort !res ~compare:(fun (_env1, path1) (_env2, path2) ->
+                        let%bind res, cuts = eval_query b workers_info in
+                        let res = List.filter !res ~f:(fun (_, path) ->
+                            List.exists !cuts ~f:(fun cut_path ->
+                                remove_due_to_cut path cut_path) |> not
+                          ) in
+                        let sorted_res = List.sort res ~compare:(fun (_env1, path1) (_env2, path2) ->
                             (* need to sort by path *)
-                            let a = List.compare Int.compare path1 path2 in
+                            let a = List.compare (fun (a,_) (b,_) -> Int.compare a b) path1 path2 in
                             if a = 0 then
                             (List.length path1) - (List.length path2)
                             else a
                           )
                         in
-                        let envs = List.map sorted_res ~f:(fun (env, _) -> env) in
+                        let envs = List.map sorted_res ~f:(fun (env, _) -> env) |> List.rev in
                         (* print the result *)
                         print_string "\n";
                         print_endline (string_of_res envs orig_vars orig_vars_num);

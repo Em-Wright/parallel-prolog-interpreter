@@ -5,19 +5,19 @@ open Trail_util
 
 module Job = struct
   type t = {
-    goals : Exp.t ref list;
+    goals : (Exp.t ref * int) list;
     var_mapping : Exp.t Var.t String.Table.t;
-    path : int list
+    path : (int*int) list
   } [@@deriving fields]
 
   type serialisable = {
-    goals : Exp.serialisable list;
+    goals : (Exp.serialisable * int) list;
     var_mapping : Exp.serialisable Var.serialisable String.Table.t;
-    path : int list
+    path : (int*int) list
   } [@@deriving bin_io]
 
   let serialise ({goals;var_mapping;path} : t) : serialisable =
-    let goals = List.map goals ~f:(fun g -> Exp.serialise !g) in
+    let goals = List.map goals ~f:(fun (g, d) -> Exp.serialise !g, d) in
     let var_mapping = Hashtbl.map var_mapping ~f:(fun v ->
         Var.serialise v Exp.resolve_to_furthest_instance Exp.serialise
       ) in
@@ -25,7 +25,7 @@ module Job = struct
 
 
   let deserialise ({goals; var_mapping; path} : serialisable) : t =
-    let all_var_names = List.fold goals ~init:[] ~f:(fun acc g ->
+    let all_var_names = List.fold goals ~init:[] ~f:(fun acc (g,_) ->
         Exp.get_all_var_names g acc
       ) |> String.Set.of_list
     in
@@ -39,8 +39,8 @@ module Job = struct
         Var.deserialise v_serialised Exp.deserialise temp_var_mapping
       )
     in
-    let goals = List.map goals ~f:(fun goal ->
-        Exp.deserialise goal temp_var_mapping |> ref
+    let goals = List.map goals ~f:(fun (goal, d) ->
+        (Exp.deserialise goal temp_var_mapping |> ref , d)
       )
     in
     {goals; var_mapping; path}
@@ -51,7 +51,7 @@ module Job = struct
         Var.deep_copy v (fun e -> Exp.deep_copy e var_translation) var_translation
       )
     in
-    let new_goals = List.map goals ~f:(fun e -> Exp.reref_vars !e var_translation |> ref) in
+    let new_goals = List.map goals ~f:(fun (e,d) -> Exp.reref_vars !e var_translation |> ref, d) in
     {goals=new_goals; var_mapping=new_var_mapping; path}
 end
 
@@ -64,7 +64,7 @@ module Job_and_bool = struct
 end
 
 module Results = struct
-  type t = ((string * string) list * int list) list [@@deriving bin_io]
+  type t = ((string * string) list * (int*int) list) list [@@deriving bin_io]
 
   let reverse_path_order t : t =
     List.map t ~f:( fun (env, path) -> (env, List.rev path))
@@ -74,26 +74,30 @@ module Worker_to_toplevel = struct
   type t =
     Results of Results.t
     | Job of Job_and_nxt.t
-    | Cut of int list
+    | Cut of (int*int) list
   [@@deriving bin_io]
 end
 
 module Toplevel_to_worker = struct
   type t =
     Work_request
-    | Cut of int list
+    | Cut of (int*int) list
   [@@deriving bin_io]
 end
 
 let remove_due_to_cut path cut_path =
   let rec loop p cp =
-    (* if the cut path is 18243, we remove any paths which begin 1824, with a 5th digit >3 *)
     match p, cp with
-    | x::_, y::[] -> if x > y then true else false
-    | x::xs, y::ys -> if x = y then loop xs ys else false
+    | (x,dx)::_, (y, dy)::[] -> if x > y && dx=dy then true else false
+    | (x,dx)::xs, (y, dy)::ys -> if x = y && dx=dy then loop xs ys else false
     | _,_ -> false
   in
   loop path (List.rev cut_path)
+
+let rec truncate path depth =
+  match path with
+  | (_, d)::p -> if d > depth then truncate p depth else  path
+  | [] -> []
 
 module T = struct
 
@@ -136,16 +140,18 @@ module T = struct
      - have function remove results with paths which will be removed by a cut (as well as the main
      process double checking)
   *)
-  let eval (job : Job.t) db : Job.t list * int list option =
+  let eval (job : Job.t) db : Job.t list * (int*int) list option =
       match job.goals with
       | [] -> [], None
-      | g1::gl -> (
+      | (g1, depth)::gl -> (
           (
             match !g1 with
             (* if goal is the true predicate *)
             | Exp.TermExp("false", []) -> [], None
             | Exp.TermExp("true", []) -> [ {goals=gl;var_mapping=job.var_mapping; path=job.path} ], None
-            | TermExp ("cut", []) -> [ {goals=gl;var_mapping=job.var_mapping; path=job.path} ], Some job.path
+            | TermExp ("cut", []) ->
+              let truncated = truncate job.path depth in
+              [ {goals=gl;var_mapping=job.var_mapping; path=job.path} ], Some truncated
             | TermExp("equals", [lhs; rhs]) ->
               (* check if the lhs and rhs can unify *)
               let trail = Trail.create () in
@@ -239,8 +245,9 @@ module T = struct
                       let (head, body) = Clause.copy c in
                       let trail = Trail.create () in
                       if unify head g1 trail then (
+                        let body2 = List.zip_exn body (List.init (List.length body) ~f:(fun _ -> (depth+1))) in
                         let new_job = Job.deep_copy
-                            {goals=(body@gl); var_mapping=job.var_mapping; path=(i::job.path)} in
+                            {goals=(body2@gl); var_mapping=job.var_mapping; path=((i, depth+1)::job.path)} in
                         Trail.undo trail;
                         (new_job)::acc
                       ) else (
@@ -293,7 +300,7 @@ module T = struct
     let%bind _ =
     if send_initial_jobs_bool then loop_send_jobs () else Deferred.unit
         in
-    let rec main_inner (results : ((string * string) list * int list) list) =
+    let rec main_inner (results : ((string * string) list * (int*int) list) list) =
       let%bind _check_for_requests =
         (* NOTE - if you ever use a `read' function to check if there's
            anything in the pipe, make sure to use read_now - `read' waits
@@ -307,7 +314,7 @@ module T = struct
             Deque.iteri worker_state.q
               ~f:(fun i job ->
                   if remove_due_to_cut job.path cut then
-                    Deque.set_exn worker_state.q i ({job with goals=[ref (Exp.TermExp("false", []))]})
+                    Deque.set_exn worker_state.q i ({job with goals=[ref (Exp.TermExp("false", [])), 0]})
               );
             Deferred.unit
           | Some Work_request -> (
@@ -326,17 +333,8 @@ module T = struct
       | None -> Pipe.write worker_state.writer (Results (Results.reverse_path_order results))
       | Some {goals =[]; var_mapping; path} ->
         let soln = realise_solution var_mapping in
-        print_endline "solutions =============";
-        List.iter soln ~f:(fun (key, data) -> print_endline (key^" = "^data));
-        print_endline "===============";
         main_inner ((soln, path)::results)
       | Some job -> (
-          let goals_str = List.fold ~init:"" job.goals ~f:(fun acc g -> let gs = Exp.to_string !g in
-                                                            acc^","^gs) in
-          print_endline ("goals: "^goals_str);
-          let var_map_string = String.Table.fold job.var_mapping ~init:""
-              ~f:(fun ~key ~data acc -> "(" ^ key ^ "," ^ (Var.to_string data Exp.to_string) ^ ")"^acc) in
-          print_endline ("var_mapping: "^var_map_string);
           let jobs, cut = eval job worker_state.db in
           (match cut with
            | Some cut ->
@@ -382,11 +380,8 @@ module T = struct
         and type connection_state := Connection_state.t) =
   struct
     let eval_query_impl ~worker_state ~conn_state:() ((job : Job.serialisable), highest_var, send_initial_jobs_bool) =
-      print_endline ("Updating highest_var: "^(Int.to_string highest_var)^"\n\n");
       update highest_var;
-
       let job = Job.deserialise job in
-
       Deque.enqueue_back (Worker_state.q worker_state) job;
       main worker_state send_initial_jobs_bool
     ;;
@@ -427,9 +422,6 @@ module T = struct
 
     let toplevel_to_worker_pipe =
       C.create_reverse_pipe
-        (* function allows you to send a query and a pipe of updates to a worker
-           so we want to change the type of the update
-        *)
         ~f:toplevel_to_worker_pipe_impl
         ~bin_query:Unit.bin_t
         ~bin_update:Toplevel_to_worker.bin_t
@@ -653,34 +645,25 @@ let main filename num_workers =
                         (* NOTE we create an empty var_mapping here so we don't have overlap between the rules and the
                            query *)
                         let var_mapping : Exp.serialisable Var.serialisable String.Table.t = String.Table.create () in
-                        let b_converted : Exp.serialisable list = List.map b
-                            ~f:(fun e -> convert_serialisable e var_mapping ) in
+                        let b_converted : (Exp.serialisable * int) list = List.map b
+                            ~f:(fun e -> convert_serialisable e var_mapping, 0 ) in
                         (* send additional db entries to workers *)
                         let%bind _ = send_db_to_workers db workers_info in
                         (* evaluate query *)
                         let%bind res, cuts = eval_query {goals=b_converted; var_mapping; path=[]} workers_info in
                         let res = List.filter !res ~f:(fun (_, path) ->
                             List.exists !cuts ~f:(fun cut_path ->
-                                let b = remove_due_to_cut path cut_path in
-                                print_endline
-                                  ((List.to_string ~f:string_of_int path)
-                                   ^(List.to_string ~f:(string_of_int) cut_path)
-                                   ^(string_of_bool b)
-                                  );
                                 remove_due_to_cut path cut_path) |> not
                           ) in
-                        print_endline (string_of_int (List.length !cuts));
                         let sorted_res = List.sort res ~compare:(fun (_env1, path1) (_env2, path2) ->
-                            (* need to sort by path *)
-                            let a = List.compare Int.compare path1 path2 in
+                            let a = List.compare (fun (a,_) (b,_) -> Int.compare a b) path1 path2 in
                             if a = 0 then
                             (List.length path1) - (List.length path2)
                             else a
                           )
                         in
-                        let envs = List.map sorted_res ~f:(fun (env, _) -> env) in
                         (* print the result *)
-                        List.iter envs ~f:(fun result ->
+                        List.iter sorted_res ~f:(fun (result, _) ->
                             print_endline "===============";
                             List.iter result ~f:(fun (a,b) ->
                                 print_endline (a ^ " = "^b)
