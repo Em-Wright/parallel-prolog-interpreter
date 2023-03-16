@@ -30,6 +30,6 @@
  (name trail_parallel)
  (promote (until-clean))
  (modules trail_parallel)
- (libraries async core core_unix parallel_trail_prolog_interpreter rpc_parallel)
+ (libraries async core core_unix trail_parallel rpc_parallel)
  (preprocess (pps ppx_jane))
 )

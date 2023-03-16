@@ -1,4 +1,4 @@
 (test
  (name all_tests)
-(libraries ounit2 prolog_interpreter)
+ (libraries ounit2 prolog_interpreter trail_sequential trail_parallel)
 )

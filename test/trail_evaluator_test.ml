@@ -1,17 +1,33 @@
 open OUnit2
-open Prolog_interpreter.Ast
-open Prolog_interpreter.Util
-open Prolog_interpreter.Evaluator
+open Trail_sequential.Trail_evaluator
 open Core
 
 
 let identity_func s = s
 let turn_to_unit _ = ()
 
-let eval_query arg vars = let (res, _) = eval_query arg vars in res
+let eval_query (b, db, _ ) _vars =
+  let db_converted : Clause.t list = List.map db
+      ~f:(fun dec ->
+          let var_mapping = String.Table.create () in
+          match (dec : Prolog_interpreter.Ast.dec) with
+          | Clause (h, b) -> let h2 = convert h var_mapping in
+            let b2 = List.map b ~f:(fun e -> convert e var_mapping |> ref) in
+            (ref h2, b2)
+          | Query _ -> Error.raise (Error.of_string "There should be no queries in the database")
+        )
+  in
+  let var_mapping = String.Table.create () in
+  let b_converted : Exp.t ref list = List.map b ~f:(fun e -> convert e var_mapping |> ref ) in
+  let trail = Stack.create () in
+  let res, _ = eval_query b_converted db_converted trail var_mapping in
+  let res_str =
+    List.fold res ~init:"" ~f:(fun acc soln -> soln ^"\n"^acc)
+  in
+  if List.length res > 0 then res_str^"true\n" else res_str^"false\n"
 
-let evaluator_test_suite =
-    "Sequential Evaluator" >::: (
+let trail_evaluator_test_suite =
+    "TrailEvaluator" >::: (
         List.map ~f:(
             fun (arg, res) ->
                 let title =
@@ -25,21 +41,8 @@ let evaluator_test_suite =
                 )
         )
         [
-            (* Fresh variables *)
-            (turn_to_unit (reset());
-             turn_to_unit (fresh());
-             fresh()
-            ), "2";
-
-            (turn_to_unit (fresh());
-             turn_to_unit (fresh());
-             turn_to_unit (reset());
-             fresh()
-            ), "1";
-
-
             (* Evaluating results of a query with a given db *)
-            (string_of_res
+            (
                 (eval_query
                     (
                         [],
@@ -47,11 +50,9 @@ let evaluator_test_suite =
                         []
                     ) String.Set.empty
                 )
-                []
-                0
-            ), "true\n";
+            ), "\ntrue\n";
 
-            (string_of_res
+            (
                 (eval_query
                     (
                         [TermExp ("true", [])],
@@ -59,12 +60,10 @@ let evaluator_test_suite =
                         []
                       ) String.Set.empty
                 )
-                []
-                0
-            ), "true\n";
+            ), "\ntrue\n";
 
 
-            (string_of_res
+            (
                 (eval_query
                     (
                         [TermExp ("male", [TermExp ("elizabeth", [])])],
@@ -72,11 +71,9 @@ let evaluator_test_suite =
                         []
                     ) String.Set.empty
                 )
-                []
-                0
             ), "false\n";
 
-            (string_of_res
+            (
                 (eval_query
                     (
                         [TermExp ("parent", [VarExp "X"; TermExp ("charles1", [])])],
@@ -84,11 +81,9 @@ let evaluator_test_suite =
                         []
                     ) (String.Set.of_list ["X"])
                 )
-                []
-                0
             ), "false\n";
 
-            (string_of_res
+            (
                 (eval_query
                     (
                         [TermExp ("male", [TermExp ("elizabeth", [])])],
@@ -96,11 +91,9 @@ let evaluator_test_suite =
                         []
                     ) String.Set.empty
                 )
-                []
-                0
             ), "false\n";
 
-            (string_of_res
+            (
                 (eval_query
                     (
                         [TermExp ("male", [TermExp ("elizabeth", [])])],
@@ -108,11 +101,9 @@ let evaluator_test_suite =
                         []
                     ) String.Set.empty
                 )
-                []
-                0
             ), "false\n";
 
-            (string_of_res
+            (
                 (eval_query
                     (
                         [TermExp ("female", [TermExp ("elizabeth", [])])],
@@ -120,11 +111,9 @@ let evaluator_test_suite =
                         []
                     ) String.Set.empty
                 )
-                []
-                0
-            ), "true\n";
+            ), "\ntrue\n";
 
-            (string_of_res
+            (
                 (eval_query
                     (
                         [TermExp ("female", [TermExp ("elizabeth", [])])],
@@ -132,11 +121,9 @@ let evaluator_test_suite =
                         []
                     ) String.Set.empty
                 )
-                []
-                0
-            ), "true\n";
+            ), "\ntrue\n";
 
-            (string_of_res
+            (
                 (eval_query
                     (
                         [TermExp ("female", [TermExp ("elizabeth", [])])],
@@ -144,24 +131,9 @@ let evaluator_test_suite =
                         []
                     ) String.Set.empty
                 )
-                []
-                0
-            ), "true\n";
+            ), "\ntrue\n";
 
-            (string_of_res
-                (eval_query
-                    (
-                        [TermExp ("male", [TermExp ("elizabeth", [])])],
-                        [Query([TermExp ("male", [TermExp ("elizabeth", [])])]);
-                         Clause (TermExp("female", [TermExp("elizabeth", [])]), [TermExp("true", [])])],
-                        []
-                    ) String.Set.empty
-                )
-                []
-                0
-            ), "false\n";
-
-            (string_of_res
+            (
                 (eval_query
                     (
                         [TermExp("age", [TermExp("zaid",[]); VarExp "Y"])],
@@ -170,11 +142,9 @@ let evaluator_test_suite =
                     )
                     (String.Set.of_list ["Y"])
                 )
-                [VarExp "Y"]
-                1
             ), "false\n";
 
-            (string_of_res
+            (
                 (eval_query
                     (
                         [TermExp("age", [TermExp("zaid",[]); VarExp "Y"])],
@@ -184,12 +154,10 @@ let evaluator_test_suite =
                     )
                   (String.Set.of_list ["Y"])
                 )
-                [VarExp "Y"]
-                1
             ), "false\n";
 
 
-            (string_of_res
+            (
                 (eval_query
                     (
                         [TermExp("age", [VarExp "E"; VarExp "Z"])],
@@ -199,11 +167,9 @@ let evaluator_test_suite =
                     )
                   (String.Set.of_list ["E"; "Z"])
                 )
-                [VarExp "Z"; VarExp "E"]
-                2
             ), "====================\nE = adam\nZ = 10\n====================\n====================\nE = zaid\nZ = 5\n====================\ntrue\n";
 
-            (string_of_res
+            (
                 (eval_query
                     (
                         [TermExp("age", [VarExp "X";  (IntExp 5)])],
@@ -213,11 +179,9 @@ let evaluator_test_suite =
                     )
                   (String.Set.of_list ["X"])
                 )
-                [VarExp "X"]
-                1
             ), "====================\nX = zaid\n====================\ntrue\n";
 
-            (string_of_res
+            (
                 (eval_query
                     (
                         [TermExp ("a", [])],
@@ -226,11 +190,9 @@ let evaluator_test_suite =
                     )
                     String.Set.empty
                 )
-                []
-                0
-            ), "true\n";
+            ), "\ntrue\n";
 
-            (string_of_res
+            (
                (eval_query
                   (
                     [TermExp ("prepend", [
@@ -255,11 +217,9 @@ let evaluator_test_suite =
                   )
                   (String.Set.of_list ["X"])
                )
-               [VarExp "X"]
-               1
             ), "====================\nX = [1, 2]\n====================\ntrue\n";
 
-            (string_of_res
+            (
                (eval_query
                   (
                     [TermExp("nat1", [VarExp "Z"])],
@@ -274,11 +234,9 @@ let evaluator_test_suite =
                   )
                   (String.Set.of_list ["Z"])
                )
-               [VarExp "Z"]
-               1
             ), "====================\nZ = 1\n====================\ntrue\n";
 
-            (string_of_res
+            (
                (eval_query
                   (
                     [TermExp("is_ten", [VarExp "Z"])],
@@ -293,11 +251,9 @@ let evaluator_test_suite =
                   )
                   (String.Set.of_list ["Z"])
                )
-               [VarExp "Z"]
-               1
             ), "====================\nZ = 10\n====================\ntrue\n";
 
-            (string_of_res
+            (
                (eval_query
                   (
                     [TermExp("is_five", [VarExp "Z"])],
@@ -313,11 +269,9 @@ let evaluator_test_suite =
                   )
                   (String.Set.of_list ["Z"])
                )
-               [VarExp "Z"]
-               1
             ), "====================\nZ = 5\n====================\ntrue\n";
 
-            (string_of_res
+            (
                (eval_query
                   (
                     [TermExp("nat", [VarExp "Z"])],
@@ -335,8 +289,6 @@ let evaluator_test_suite =
                   )
                   (String.Set.of_list ["Z"])
                )
-               [VarExp "Z"]
-               1
             ), "====================\n\
                 Z = 0\n\
                 ====================\n\
@@ -345,7 +297,7 @@ let evaluator_test_suite =
                 ====================\n\
                 true\n";
 
-            (string_of_res
+            (
                (eval_query
                   (
                     [TermExp("not_two", [VarExp "Z"])],
@@ -363,8 +315,6 @@ let evaluator_test_suite =
                   )
                   (String.Set.of_list ["Z"])
                )
-               [VarExp "Z"]
-               1
             ), "====================\n\
                 Z = 1\n\
                 ====================\n\
@@ -375,7 +325,7 @@ let evaluator_test_suite =
                 Z = 4\n\
                 ====================\ntrue\n";
 
-            (string_of_res
+            (
                (eval_query
                   (
                     [TermExp("nat1", [VarExp "Z"])],
@@ -395,8 +345,6 @@ let evaluator_test_suite =
                   )
                   (String.Set.of_list ["Z"])
                )
-               [VarExp "Z"]
-               1
             ), "====================\n\
                 Z = -1\n\
                 ====================\n\
@@ -405,7 +353,7 @@ let evaluator_test_suite =
                 ====================\n\
                 true\n";
 
-            (string_of_res
+            (
                 (eval_query
                     (
                         [TermExp("age", [VarExp "X"; VarExp "Y"]); TermExp("female", [VarExp "X"])],
@@ -414,11 +362,9 @@ let evaluator_test_suite =
                     )
                   (String.Set.of_list ["X"; "Y"])
                 )
-                [VarExp "Y"; VarExp "X"]
-                2
             ), "====================\nX = ann\nY = 12\n====================\ntrue\n";
 
-            (string_of_res
+            (
                 (eval_query
                     (
                         [TermExp("sibling", [TermExp("sally",[]); TermExp("erica",[])])],
@@ -427,11 +373,9 @@ let evaluator_test_suite =
                     )
                   String.Set.empty
                 )
-                []
-                0
-            ), "true\n";
+            ), "\ntrue\n";
 
-            (string_of_res
+            (
                 (eval_query
                     (
                         [TermExp("sibling", [VarExp "Z"; VarExp "E"])],
@@ -440,37 +384,35 @@ let evaluator_test_suite =
                     )
                   (String.Set.of_list ["Z"; "E"])
                 )
-                [VarExp "E"; VarExp "Z"]
-                2
             ),
             "====================
-Z = sally
 E = sally
+Z = sally
 ====================
 ====================
-Z = tom
 E = tom
+Z = tom
 ====================
 ====================
-Z = erica
 E = erica
-====================
-====================
 Z = erica
+====================
+====================
 E = sally
+Z = erica
 ====================
 ====================
-Z = sally
 E = erica
-====================
-====================
 Z = sally
+====================
+====================
 E = sally
+Z = sally
 ====================
 true
 ";
 
-            (string_of_res
+            (
                 (eval_query
                     (
                         [TermExp("animal", [VarExp "X"; VarExp "Y"])],
@@ -479,11 +421,9 @@ true
                     )
                   (String.Set.of_list ["X"; "Y"])
                 )
-                [VarExp "Y"; VarExp "X"]
-                2
-            ), "====================\nX = tom\nY is free\n====================\ntrue\n";
+            ), "====================\nX = tom\nY = is free\n====================\ntrue\n";
 
-            (string_of_res
+            (
                 (eval_query
                     (
                         [TermExp("animal", [VarExp "X"; VarExp "Y"]); VarExp "Z"],
@@ -492,11 +432,9 @@ true
                     )
                   (String.Set.of_list ["X"; "Y"; "Z"])
                 )
-                [VarExp "Z"; VarExp "Y"; VarExp "X"]
-                3
-            ), "====================\nX = tom\nY is free\nZ is free\n====================\ntrue\n";
+            ), "====================\nZ = is free\nX = tom\nY = is free\n====================\ntrue\n";
 
-            (string_of_res
+            (
                 (eval_query
                     (
                         [VarExp "X"],
@@ -505,11 +443,9 @@ true
                     )
                   (String.Set.of_list ["X"])
                 )
-                [VarExp "X"]
-                1
-            ), "====================\nX is free\n====================\ntrue\n";
+            ), "====================\nX = is free\n====================\ntrue\n";
 
-            (string_of_res
+            (
                 (eval_query
                     (
                         [TermExp("animal", [VarExp "X"; VarExp "Y"]); VarExp "Z"],
@@ -518,24 +454,9 @@ true
                     )
                   (String.Set.of_list ["X"; "Y"; "Z"])
                 )
-                [VarExp "Z"; VarExp "Y"; VarExp "X"; IntExp 10; TermExp("blah", [])]
-                3
-            ), "====================\nX = tom\nY is free\nZ is free\n====================\ntrue\n";
+            ), "====================\nZ = is free\nX = tom\nY = is free\n====================\ntrue\n";
 
-            (string_of_res
-                (eval_query
-                    (
-                        [TermExp("animal", [VarExp "X"; VarExp "Y"]); VarExp "Z"],
-                        [Clause (TermExp ("animal", [VarExp "X"; VarExp "Y"]), [TermExp ("cat", [VarExp "X"])]); Clause (TermExp ("cat", [TermExp ("tom", [])]), [TermExp ("true", [])])],
-                        [(VarExp "X", TermExp("eh",[VarExp "X"]))]
-                    )
-                  (String.Set.of_list ["X"; "Y"; "Z"])
-                )
-                [VarExp "Z"; VarExp "Y"; VarExp "X"; IntExp 10; TermExp("blah", [])]
-                3
-            ), "false\n";
-
-            (string_of_res
+            (
                 (eval_query
                     (
                         [TermExp("b", [TermExp("a", [TermExp("true",[])])])],
@@ -544,31 +465,7 @@ true
                     )
                   String.Set.empty
                 )
-                []
-                0
             ), "false\n";
 
-            (string_of_res
-               (eval_query
-                  (
-                    [TermExp("fib", [IntExp 5; VarExp "X"])],
-                    [
-                      Clause (TermExp("fib", [IntExp 0; IntExp 1]), [ TermExp ("cut", [])]);
-                      Clause (TermExp("fib", [IntExp 1; IntExp 1]), [ TermExp ("cut", [])]);
-                      Clause (TermExp("fib", [VarExp "N"; VarExp "M"]), [
-                          TermExp("is", [VarExp "N1"; ArithmeticExp(MINUS, ArithmeticVar "N", ArithmeticInt 1)]);
-                          TermExp("is", [VarExp "N2"; ArithmeticExp(MINUS, ArithmeticVar "N", ArithmeticInt 2)]);
-                          TermExp("fib", [VarExp "N1"; VarExp "K1"]);
-                          TermExp("fib", [VarExp "N2"; VarExp "K2"]);
-                          TermExp("is", [VarExp "M"; ArithmeticExp(PLUS, ArithmeticVar "K1", ArithmeticVar "K2")])
-                        ]);
-                    ],
-                    []
-                  )
-                  (String.Set.of_list ["X"])
-               )
-               [VarExp "X"]
-               1
-            ), "====================\nX = 8\n====================\ntrue\n";
         ]
     )

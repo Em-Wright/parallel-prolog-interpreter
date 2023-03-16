@@ -17,7 +17,12 @@ module Var = struct
 
   let to_string {name; instance} (f : 'a -> string) =
     match instance with
-    | None -> "Var" ^ name
+    | None -> "Var_" ^ name
+    | Some x -> f !x
+
+  let to_soln_string {name=_; instance} (f : 'a -> string) =
+    match instance with
+    | None -> "is free"
     | Some x -> f !x
 
   let equal v1 v2 = String.equal v1.name v2.name
@@ -49,13 +54,46 @@ module Exp = struct
       | TermExp of string * t ref list
       | ArithmeticExp of Ast.arithmetic_operator * t Arithmetic_operand.t * t Arithmetic_operand.t
 
-    let rec to_string t =
+    let rec resolve_exp_instance (e : t) =
+      match e with
+      | VarExp v -> (
+          match !v.instance with
+          | None -> VarExp v
+          | Some e -> resolve_exp_instance !e
+        )
+      | _ -> e
+
+    let rec to_string (t : t) =
+      let readable_string_of_list list_exp =
+        let rec inner_string list_exp =
+          match list_exp with
+          | TermExp ("empty_list", []) -> ""
+          | TermExp ("list", [element; rest]) ->(
+            let resolved = resolve_exp_instance !rest in
+            match resolved with
+            | TermExp ("empty_list", _) -> to_string !element
+            | TermExp ("list", _) ->
+              let rest_of_string = inner_string resolved in
+              (to_string !element) ^ ", " ^ rest_of_string
+            | _ -> ""
+          )
+          | VarExp v -> Var.to_string !v to_string
+          | _ -> "This is not a list, but has been given to the readable_string_of_list function"
+        in
+        "[" ^ (inner_string list_exp) ^ "]"
+      in
       match t with
-      | VarExp v -> Var.to_string !v to_string
+      | VarExp v -> (Var.to_soln_string !v to_string)
       | IntExp i -> Int.to_string i
       | TermExp (name, args) ->
-        let arg_string = List.fold args ~init:"" ~f:(fun acc arg -> acc ^ (to_string !arg) ^ ", ") in
-        name ^ "(" ^ arg_string ^ ")"
+        ( match name with
+          | "list" | "empty_list" -> readable_string_of_list t
+          | _ -> if List.length args > 0 then
+              let arg_string = List.fold args ~init:"" ~f:(fun acc arg -> acc ^ (to_string !arg) ^ ", ") in
+              name ^ "(" ^ arg_string ^ ")"
+            else
+              name
+        )
       | ArithmeticExp (operator, op1, op2 ) ->
         (Arithmetic_operand.to_string op1 to_string)
         ^ (operator_to_string operator)
@@ -197,13 +235,25 @@ module Clause = struct
 end
 
 let print_solution var_mapping =
-  print_endline "============";
+  print_endline "====================";
   Hashtbl.iteri var_mapping
     ~f:(fun ~key ~data ->
         let line = key ^ " = " ^ (Var.to_string data Exp.to_string) in
         print_endline line
       );
-    print_endline "============"
+  print_endline "===================="
+
+let solution_to_string var_mapping =
+  let soln_str =
+  (
+    Hashtbl.fold ~init:"" var_mapping
+    ~f:(fun ~key ~data acc ->
+        acc ^
+        key ^ " = " ^ (Var.to_soln_string data Exp.to_string) ^"\n"
+      )
+  )in
+  ( if Hashtbl.length var_mapping > 0 then
+      "====================\n"^soln_str^"====================" else "")
 
 let perform_arithmetic (op : Ast.arithmetic_operator) i1 i2 =
   match op with
@@ -240,18 +290,24 @@ let rec resolve (e : Exp.t) =
 
 let rec eval_query q db (trail : Trail.t) var_mapping =
   match q with
-  | [] -> print_solution var_mapping
+  | [] -> [solution_to_string var_mapping], false
   | g1::gl ->
       (
         match !g1 with
         (* if goal is the true predicate *)
         | Exp.TermExp("true", []) -> eval_query gl db trail var_mapping
+        | TermExp("cut", []) -> let res, _ = eval_query gl db trail var_mapping in
+          (res, true)
         | TermExp("equals", [lhs; rhs]) -> (
             (* check if the lhs and rhs can unify *)
             let t = Trail.mark trail in
-            if unify lhs rhs trail then
-              eval_query gl db trail var_mapping;
-            Trail.undo trail t
+            let res = 
+              if unify lhs rhs trail then
+                eval_query gl db trail var_mapping
+              else ([], false)
+            in
+            Trail.undo trail t;
+            res
           )
         | TermExp("not_equal", [lhs;rhs]) -> (
             (* check if the lhs and rhs can unify. If they can, this is not a
@@ -259,39 +315,46 @@ let rec eval_query q db (trail : Trail.t) var_mapping =
                rest of the goals
             *)
             let t = Trail.mark trail in
-            if not (unify lhs rhs trail) then (
-              Trail.undo trail t;
-              eval_query gl db trail var_mapping;
-            );
-            Trail.undo trail t
+            let res =
+              if not (unify lhs rhs trail) then (
+                Trail.undo trail t;
+                eval_query gl db trail var_mapping;
+              ) else ([], false)
+            in
+            Trail.undo trail t;
+            res
           )
         | TermExp("greater_than", [lhs; rhs]) -> (
           match (resolve !lhs), (resolve !rhs) with
           | IntExp i1, IntExp i2 ->
             if i1 > i2 then
               eval_query gl db trail var_mapping
-          | _ -> () (* arguments insufficiently instantiated *)
+            else [], false
+          | _ -> [], false (* arguments insufficiently instantiated *)
         )
         | TermExp("greater_than_or_eq", [lhs; rhs]) -> (
             match (resolve !lhs), (resolve !rhs) with
             | IntExp i1, IntExp i2 ->
               if i1 >= i2 then
                 eval_query gl db trail var_mapping
-            | _ -> () (* arguments insufficiently instantiated *)
+              else [], false
+            | _ -> [], false (* arguments insufficiently instantiated *)
           )
         | TermExp("less_than", [lhs; rhs]) -> (
             match (resolve !lhs), (resolve !rhs) with
             | IntExp i1, IntExp i2 ->
               if i1 < i2 then
                 eval_query gl db trail var_mapping
-            | _ -> () (* arguments insufficiently instantiated *)
+              else [], false
+            | _ -> [], false (* arguments insufficiently instantiated *)
           )
         | TermExp("less_than_or_eq", [lhs; rhs]) -> (
             match (resolve !lhs), (resolve !rhs) with
             | IntExp i1, IntExp i2 ->
               if i1 <= i2 then
                 eval_query gl db trail var_mapping
-            | _ -> () (* arguments insufficiently instantiated *)
+              else [], false
+            | _ -> [], false (* arguments insufficiently instantiated *)
           )
         | TermExp("is", [lhs; rhs]) -> (
             (* evaluate the arithmetic expressions with current substitutions, then check if it is
@@ -302,44 +365,48 @@ let rec eval_query q db (trail : Trail.t) var_mapping =
                 | ArithmeticInt i1, ArithmeticInt i2 -> (
                     let result = perform_arithmetic op i1 i2 in
                     let t = Trail.mark trail in
+                    let res =
                     (
                       match !lhs with
                       | VarExp _ -> if unify lhs (ref (Exp.IntExp result)) trail then
-                          eval_query gl db trail var_mapping
-                      | IntExp i -> if i = result then eval_query gl db trail var_mapping
-                      | _ -> ()
-                    ); Trail.undo trail t
+                          eval_query gl db trail var_mapping else [], false
+                      | IntExp i -> if i = result then eval_query gl db trail var_mapping else [], false
+                      | _ -> [], false
+                    ) in Trail.undo trail t; res
                   )
-                | _ -> ()
+                | _ -> [], false
               )
             | IntExp result -> (
                 let t = Trail.mark trail in
-                (
+                 let res = (
                   match !lhs with
                   | VarExp _ -> if unify lhs (ref (Exp.IntExp result)) trail then
-                      eval_query gl db trail var_mapping
-                  | IntExp i -> if i = result then eval_query gl db trail var_mapping
-                  | _ -> ()
-                ); Trail.undo trail t
+                      eval_query gl db trail var_mapping else [], false
+                  | IntExp i -> if i = result then eval_query gl db trail var_mapping else [], false
+                  | _ -> [], false
+                )
+                in Trail.undo trail t; res
               )
-            | _ -> ()
+            | _ -> [], false
           )
         | TermExp(_,_) -> (
             let db_copy = List.map db ~f:(fun clause -> Clause.copy clause trail) in
-            let rec loop db_copy =
+            let rec loop db_copy res =
               match db_copy with
-              | [] -> ()
+              | [] -> res
               | c::dbs -> (let t = Trail.mark trail in
                            let (head, body) = Clause.copy c trail in
                            Trail.undo trail t;
-                           if unify head g1 trail then (
-                             eval_query (body@gl) db trail var_mapping
-                           );
+                           let res2, cut =
+                             if unify head g1 trail then (
+                               eval_query (body@gl) db trail var_mapping
+                             ) else [], false in
                            Trail.undo trail t;
-                           loop dbs
+                           if cut then res2@res else
+                             loop dbs (res2@res)
                           )
             in
-            loop db_copy )
+            loop db_copy [] , false)
         | _ -> eval_query gl db trail var_mapping
       )
 
@@ -399,7 +466,8 @@ let command =
               let var_mapping = String.Table.create () in
               let b_converted : Exp.t ref list = List.map b ~f:(fun e -> convert e var_mapping |> ref ) in
               let trail = Stack.create () in
-              eval_query b_converted db_converted trail var_mapping;
+              let res, _ = eval_query b_converted db_converted trail var_mapping in
+              List.iter res ~f:print_endline;
               []
             )
     ]

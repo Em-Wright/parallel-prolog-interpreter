@@ -1,5 +1,7 @@
+
+
 open Core
-open Include
+module Ast = Prolog_interpreter.Ast
 
 let (fresh, reset, update) =
   let nxt = ref 0 in

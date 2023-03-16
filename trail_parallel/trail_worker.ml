@@ -74,8 +74,26 @@ module Worker_to_toplevel = struct
   type t =
     Results of Results.t
     | Job of Job_and_nxt.t
+    | Cut of int list
   [@@deriving bin_io]
 end
+
+module Toplevel_to_worker = struct
+  type t =
+    Work_request
+    | Cut of int list
+  [@@deriving bin_io]
+end
+
+let remove_due_to_cut path cut_path =
+  let rec loop p cp =
+    (* if the cut path is 18243, we remove any paths which begin 1824, with a 5th digit >3 *)
+    match p, cp with
+    | x::_, y::[] -> if x > y then true else false
+    | x::xs, y::ys -> if x = y then loop xs ys else false
+    | _,_ -> false
+  in
+  loop path (List.rev cut_path)
 
 module T = struct
 
@@ -87,7 +105,7 @@ module T = struct
       q : Job.t Deque.t;
       index : int;
       mutable db : Clause.t list;
-      mutable reader : unit Pipe.Reader.t;
+      mutable reader : Toplevel_to_worker.t Pipe.Reader.t;
       mutable writer : Worker_to_toplevel.t Pipe.Writer.t
     } [@@deriving fields]
   end
@@ -107,20 +125,33 @@ module T = struct
      either manages to prove it, returning the empty list, or generates one or more other
      jobs to be done.
   *)
-  let eval (job : Job.t) db : Job.t list =
+
+  (* TODO going to need to keep track of locations of cuts, and remove any results from the cut at the end.
+  Can potentially identify which jobs not to bother with if we know in advance
+     X add Some/None path to the return of this function
+     - have the main function send and receive Cut messages - might need to make a separate Toplevel_to_worker
+     module which has cut messages and work requests
+     - have the main function remove jobs with paths which will be removed by a cut (need to figure out
+     what these paths are exactly)
+     - have function remove results with paths which will be removed by a cut (as well as the main
+     process double checking)
+  *)
+  let eval (job : Job.t) db : Job.t list * int list option =
       match job.goals with
-      | [] -> []
+      | [] -> [], None
       | g1::gl -> (
           (
             match !g1 with
             (* if goal is the true predicate *)
-            | Exp.TermExp("true", []) -> [ {goals=gl;var_mapping=job.var_mapping; path=job.path} ]
+            | Exp.TermExp("false", []) -> [], None
+            | Exp.TermExp("true", []) -> [ {goals=gl;var_mapping=job.var_mapping; path=job.path} ], None
+            | TermExp ("cut", []) -> [ {goals=gl;var_mapping=job.var_mapping; path=job.path} ], Some job.path
             | TermExp("equals", [lhs; rhs]) ->
               (* check if the lhs and rhs can unify *)
               let trail = Trail.create () in
               if (unify lhs rhs trail) then (
-                [ {goals=gl; var_mapping=job.var_mapping; path=job.path} ]
-              ) else (Trail.undo trail; [])
+                [ {goals=gl; var_mapping=job.var_mapping; path=job.path} ], None
+              ) else (Trail.undo trail; [], None)
             | TermExp("not_equal", [lhs;rhs]) -> (
                 (* check if the lhs and rhs can unify. If they can, this is not a
                    successful substitution. If they don't, we can continue solving the
@@ -129,40 +160,40 @@ module T = struct
                 let trail = Trail.create () in
                 if not (unify lhs rhs trail) then (
                   Trail.undo trail;
-                  [ {goals=gl; var_mapping=job.var_mapping; path=job.path} ]
-                ) else (Trail.undo trail; [])
+                  [ {goals=gl; var_mapping=job.var_mapping; path=job.path} ], None
+                ) else (Trail.undo trail; [], None)
               )
             | TermExp("greater_than", [lhs; rhs]) -> (
                 match (resolve !lhs), (resolve !rhs) with
                 | IntExp i1, IntExp i2 ->
                   if i1 > i2 then
-                    [ {goals=gl; var_mapping=job.var_mapping; path=job.path}]
-                  else []
-                | _ -> [] (* arguments insufficiently instantiated *)
+                    [ {goals=gl; var_mapping=job.var_mapping; path=job.path}], None
+                  else [], None
+                | _ -> [], None (* arguments insufficiently instantiated *)
               )
             | TermExp("greater_than_or_eq", [lhs; rhs]) -> (
                 match (resolve !lhs), (resolve !rhs) with
                 | IntExp i1, IntExp i2 ->
                   if i1 >= i2 then
-                    [ {goals=gl; var_mapping=job.var_mapping; path=job.path}]
-                  else []
-                | _ -> [] (* arguments insufficiently instantiated *)
+                    [ {goals=gl; var_mapping=job.var_mapping; path=job.path}], None
+                  else [], None
+                | _ -> [], None (* arguments insufficiently instantiated *)
               )
             | TermExp("less_than", [lhs; rhs]) -> (
                 match (resolve !lhs), (resolve !rhs) with
                 | IntExp i1, IntExp i2 ->
                   if i1 < i2 then
-                    [ {goals=gl; var_mapping=job.var_mapping; path=job.path}]
-                  else []
-                | _ -> [] (* arguments insufficiently instantiated *)
+                    [ {goals=gl; var_mapping=job.var_mapping; path=job.path}], None
+                  else [], None
+                | _ -> [], None (* arguments insufficiently instantiated *)
               )
             | TermExp("less_than_or_eq", [lhs; rhs]) -> (
                 match (resolve !lhs), (resolve !rhs) with
                 | IntExp i1, IntExp i2 ->
                   if i1 <= i2 then
-                    [ {goals=gl; var_mapping=job.var_mapping; path=job.path}]
-                  else []
-                | _ -> [] (* arguments insufficiently instantiated *)
+                    [ {goals=gl; var_mapping=job.var_mapping; path=job.path}], None
+                  else [], None
+                | _ -> [], None (* arguments insufficiently instantiated *)
               )
             | TermExp("is", [lhs; rhs]) -> (
                 (* evaluate the arithmetic expressions with current substitutions, then check if it is
@@ -176,30 +207,30 @@ module T = struct
                           match !lhs with
                           | VarExp _ -> let trail = Trail.create () in
                             if unify lhs (ref (Exp.IntExp result)) trail then
-                              [{goals=gl; var_mapping=job.var_mapping; path=job.path}]
-                            else (Trail.undo trail ; [])
+                              [{goals=gl; var_mapping=job.var_mapping; path=job.path}], None
+                            else (Trail.undo trail ; [], None)
                           | IntExp i -> if i = result then
-                              [{goals=gl; var_mapping=job.var_mapping; path=job.path}]
-                              else []
-                          | _ -> []
+                              [{goals=gl; var_mapping=job.var_mapping; path=job.path}], None
+                              else [], None
+                          | _ -> [], None
                         )
                       )
-                    | _ -> []
+                    | _ -> [], None
                   )
                 | IntExp result -> (
                     (
                       match !lhs with
                       | VarExp _ -> let trail = Trail.create () in
                         if unify lhs (ref (Exp.IntExp result)) trail then
-                          [{goals=gl; var_mapping=job.var_mapping; path=job.path }]
-                        else (Trail.undo trail ; [])
+                          [{goals=gl; var_mapping=job.var_mapping; path=job.path }], None
+                        else (Trail.undo trail ; [], None)
                       | IntExp i -> if i = result then
-                          [{goals=gl; var_mapping=job.var_mapping; path=job.path }]
-                          else []
-                      | _ -> []
+                          [{goals=gl; var_mapping=job.var_mapping; path=job.path }], None
+                          else [], None
+                      | _ -> [], None
                     )
                   )
-                | _ -> []
+                | _ -> [], None
               )
             | TermExp(_,_) -> (
                 let db_copy = List.map db ~f:(fun clause ->  Clause.copy clause ) in
@@ -216,9 +247,9 @@ module T = struct
                         Trail.undo trail;
                         acc
                       )
-                    )
+                    ) , None
               )
-            | _ -> []
+            | _ -> [], None
           )
         )
 
@@ -237,10 +268,16 @@ module T = struct
     | None -> []
     | Some {goals =[]; var_mapping; path} -> [((realise_solution var_mapping), path)]
     | Some job -> (
-        let jobs = eval job worker_state.db in
-        List.iter jobs
+        let jobs, cut = eval job worker_state.db in
+        (match cut with
+        | Some cut ->
+            Pipe.write_without_pushback worker_state.writer (Cut cut);
+            List.iter jobs ~f:(fun new_job ->
+              if not (remove_due_to_cut new_job.path cut) then Deque.enqueue_back worker_state.q new_job)
+        | None -> List.iter jobs
           ~f:( fun new_job ->
-              Deque.enqueue_back worker_state.q new_job );
+              Deque.enqueue_back worker_state.q new_job )
+        );
         []
       )
     in
@@ -264,7 +301,16 @@ module T = struct
         *)
           match Pipe.peek worker_state.reader with
           | None -> Deferred.unit
-          | Some () -> (
+          | Some (Cut cut) ->
+            (* if we want to remove a job as the result of a cut, set the goals to false - then
+            the next time it's evaluated, it will immediately terminate, with no results *)
+            Deque.iteri worker_state.q
+              ~f:(fun i job ->
+                  if remove_due_to_cut job.path cut then
+                    Deque.set_exn worker_state.q i ({job with goals=[ref (Exp.TermExp("false", []))]})
+              );
+            Deferred.unit
+          | Some Work_request -> (
               (* We only give out work if we have at least 2 jobs on our stack.
               Otherwise, we would give away all our work, and have to ask the
               toplevel for more *)
@@ -291,10 +337,16 @@ module T = struct
           let var_map_string = String.Table.fold job.var_mapping ~init:""
               ~f:(fun ~key ~data acc -> "(" ^ key ^ "," ^ (Var.to_string data Exp.to_string) ^ ")"^acc) in
           print_endline ("var_mapping: "^var_map_string);
-          let jobs = eval job worker_state.db in
-          List.iter jobs
-            ~f:( fun new_job ->
-                Deque.enqueue_back worker_state.q new_job );
+          let jobs, cut = eval job worker_state.db in
+          (match cut with
+           | Some cut ->
+             Pipe.write_without_pushback worker_state.writer (Cut cut);
+             List.iter jobs ~f:(fun new_job ->
+                 if not (remove_due_to_cut new_job.path cut) then Deque.enqueue_back worker_state.q new_job)
+           | None -> List.iter jobs
+                       ~f:( fun new_job ->
+                           Deque.enqueue_back worker_state.q new_job )
+          );
           main_inner results
         )
     in
@@ -321,7 +373,7 @@ module T = struct
     eval_query : ('worker, Job_and_bool.t, unit) Rpc_parallel_edit.Function.t;
     update_db : ('worker, Clause.serialisable, unit) Rpc_parallel_edit.Function.t;
     worker_to_toplevel_pipe : ('worker, unit, Worker_to_toplevel.t Pipe.Reader.t) Rpc_parallel_edit.Function.t;
-    toplevel_to_worker_pipe : ('worker, unit * unit Pipe.Reader.t, unit) Rpc_parallel_edit.Function.t
+    toplevel_to_worker_pipe : ('worker, unit * Toplevel_to_worker.t Pipe.Reader.t, unit) Rpc_parallel_edit.Function.t
   }
 
   module Functions
@@ -375,9 +427,12 @@ module T = struct
 
     let toplevel_to_worker_pipe =
       C.create_reverse_pipe
+        (* function allows you to send a query and a pipe of updates to a worker
+           so we want to change the type of the update
+        *)
         ~f:toplevel_to_worker_pipe_impl
         ~bin_query:Unit.bin_t
-        ~bin_update:Unit.bin_t
+        ~bin_update:Toplevel_to_worker.bin_t
         ~bin_response:Unit.bin_t
         ()
 
@@ -394,7 +449,7 @@ module Worker_info = struct
   type t = {
     conn : Connection.t;
     reader : Worker_to_toplevel.t Pipe.Reader.t;
-    writer : unit Pipe.Writer.t
+    writer : Toplevel_to_worker.t Pipe.Writer.t
   } [@@deriving fields]
 end
 
@@ -493,12 +548,18 @@ let eval_query (job : Job.serialisable) worker_info_list =
     update_have_work index true
   in
   let request_work index =
-    Pipe.write_without_pushback  (List.nth_exn worker_info_list index).writer ();
+    Pipe.write_without_pushback  (List.nth_exn worker_info_list index).writer Work_request;
     update_requested_work index true
+  in
+  let send_cut cut index_of_sender =
+    Deferred.List.iteri worker_info_list ~f:(fun index {conn=_; reader=_; writer} ->
+        if not (Int.equal index_of_sender index) then Pipe.write writer cut else Deferred.unit
+      )
   in
 
   let spare_jobs = Queue.create () in
   let accumulated_results = ref [] in
+  let accumulated_cuts = ref [] in
 
   (* start by giving work to the first worker, then requesting work if we have more than 1 worker *)
   let b = if num_workers > 1 then true else false in
@@ -518,6 +579,8 @@ let eval_query (job : Job.serialisable) worker_info_list =
         | `Ok (Results results) ->
           Hashtbl.set have_work__requested_work ~key:index ~data:(false, false);
           accumulated_results := (results@(!accumulated_results))
+        | `Ok (Cut cut) -> don't_wait_for (send_cut (Cut cut) index);
+          accumulated_cuts := ([cut]@(!accumulated_cuts))
       );
     (* give new_jobs to any idle workers and update have_work accordingly *)
     let idle = Hashtbl.filter have_work__requested_work ~f:(fun (b, _) -> not b) in
@@ -545,7 +608,7 @@ let eval_query (job : Job.serialisable) worker_info_list =
     if (Hashtbl.count have_work__requested_work ~f:(fun (have_work, _) -> have_work)) = 0 &&
        (Queue.length spare_jobs ) = 0
     then
-      return accumulated_results
+      return (accumulated_results, accumulated_cuts)
     else
       (
         let%bind _ = Clock.after (Time.Span.of_ns 10.0) in
@@ -595,8 +658,19 @@ let main filename num_workers =
                         (* send additional db entries to workers *)
                         let%bind _ = send_db_to_workers db workers_info in
                         (* evaluate query *)
-                        let%bind res = eval_query {goals=b_converted; var_mapping; path=[]} workers_info in
-                        let sorted_res = List.sort !res ~compare:(fun (_env1, path1) (_env2, path2) ->
+                        let%bind res, cuts = eval_query {goals=b_converted; var_mapping; path=[]} workers_info in
+                        let res = List.filter !res ~f:(fun (_, path) ->
+                            List.exists !cuts ~f:(fun cut_path ->
+                                let b = remove_due_to_cut path cut_path in
+                                print_endline
+                                  ((List.to_string ~f:string_of_int path)
+                                   ^(List.to_string ~f:(string_of_int) cut_path)
+                                   ^(string_of_bool b)
+                                  );
+                                remove_due_to_cut path cut_path) |> not
+                          ) in
+                        print_endline (string_of_int (List.length !cuts));
+                        let sorted_res = List.sort res ~compare:(fun (_env1, path1) (_env2, path2) ->
                             (* need to sort by path *)
                             let a = List.compare Int.compare path1 path2 in
                             if a = 0 then
