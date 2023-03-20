@@ -161,72 +161,14 @@ let rec eval_query (q, db, env) orig_vars =
         (* if goal is some other predicate *)
         | TermExp(_,_) -> (
         (* iterate over the db *)
-        let x = ref 0 in
         List.fold_until ~finish:(fun x -> x) ~f:(
             fun (r, acc_cuts) rule -> (
-                x := !x + 1;
                 match (rename_vars_in_dec rule) with (* rename vars in rule to completely fresh ones *)
                 | Clause (h, b) -> (
-                    (* check if this rule can be used for this subgoal *)
                     match unify [(g1, h)] with
-                    (* s is a list of substitutions which allows g1 and h to unify *)
                     | Some s -> (
                         match unify (s@env) with
-                        (* env2 is the new set of substitutions which is compatible with the original env
-                        and with the new set of substitutions s *)
-                        | Some env2 -> (
-                            if (List.length b = 1)
-                            then (
-                                match b with
-                                (* if the rule proved the subgoal (ie. rule was a
-                                   fact) then recurse on remaining subgoals *)
-                                | ((TermExp ("true", _)) :: _) ->
-                                  let (res, cut) =
-                                    (eval_query (
-                                        sub_lift_goals_cut s gl,
-                                        db,
-                                        env2
-                                     ) orig_vars )
-                                  in
-                                  (
-                                    match cut with
-                                    | d::cuts -> if Int.equal d depth then Stop (res @ r, cuts@acc_cuts)
-                                      else (
-                                      if d > depth then print_endline "something has gone terribly wrong";
-                                        Continue (res @ r, cut@acc_cuts))
-                                    | [] -> Continue (res @ r, acc_cuts)
-                                  )
-                                (* if rule wasn't a fact then we have more
-                                   subgoals from the body of the rule
-                                   to prove
-                                   sub_lift_goals_cut takes our substitution list, and a list of goals,
-                                   and returns the goals with the substitution applied.
-                                *)
-                                | _ ->
-                                  ( let b2 = List.zip_exn b (List.init (List.length b) ~f:(fun _ -> depth+1)) in
-                                    let (res, cut) = (eval_query (
-                                        (sub_lift_goals_cut s b2) @ (sub_lift_goals_cut s gl),
-                                        db,
-                                        env2
-                                      ) orig_vars )
-                                    in
-                                    (
-                                      match cut with
-                                      | d::cuts -> if Int.equal d depth then Stop (res @ r, cuts@acc_cuts)
-                                        else (
-                                          if d > depth then print_endline "something has gone terribly wrong";
-                                          Continue (res @ r, cut@acc_cuts))
-                                      | [] -> Continue (res @ r, acc_cuts)
-                                    )
-                                  )
-                              )
-                            else
-                                (* if rule wasn't a fact then we have more
-                                   subgoals from the body of the rule
-                                   to prove
-                                   we fold the result of evaluating the query with the other possible
-                                   solutions in r
-                                *)
+                        | Some env2 ->
                               ( let b2 = List.zip_exn b (List.init (List.length b) ~f:(fun _ -> depth+1)) in
                                 let (res, cut) = (eval_query (
                                     (sub_lift_goals_cut s b2) @ (sub_lift_goals_cut s gl),
@@ -243,7 +185,6 @@ let rec eval_query (q, db, env) orig_vars =
                                   | [] -> Continue (res @ r, acc_cuts)
                                 )
                               )
-                          )
                         (* the substitution from unify the rule head and subgoal
                            doesn't unify with the environment gathered so far *)
                         | _ -> Continue (r, acc_cuts)
