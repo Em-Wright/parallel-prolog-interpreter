@@ -63,6 +63,7 @@ let main filename ~eval_function =
               loop db ss
             )
           | Parser.Error -> ( (* failed to parse input *)
+              print_endline s;
               print_endline "\nDoes not parse\n";
               loop db ss
             )

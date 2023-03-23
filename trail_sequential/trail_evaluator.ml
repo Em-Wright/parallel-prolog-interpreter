@@ -390,8 +390,9 @@ let rec eval_query q db (trail : Trail.t) var_mapping =
             | _ -> [], []
           )
         | TermExp(_,_) -> (
-            let rec loop db (res, acc_cuts) =
-              match db with
+            let db_copy = List.map db ~f:(fun clause -> Clause.copy clause trail) in
+            let rec loop db_copy (res, acc_cuts) =
+              match db_copy with
               | [] -> (res, acc_cuts)
               | c::dbs -> (let t = Trail.mark trail in
                            let (head, body) = Clause.copy c trail in
@@ -412,7 +413,7 @@ let rec eval_query q db (trail : Trail.t) var_mapping =
                            )
                           )
             in
-            loop db ([],[]) )
+            loop db_copy ([],[]) )
         | _ -> eval_query gl db trail var_mapping
       )
 
