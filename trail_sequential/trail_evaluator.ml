@@ -474,7 +474,8 @@ let command =
               let b_converted : (Exp.t ref * int) list = List.map b ~f:(fun e -> convert e var_mapping |> ref , 0) in
               let trail = Stack.create () in
               let res, _ = eval_query b_converted db_converted trail var_mapping in
-              List.iter res ~f:print_endline;
+              if not (Int.equal (List.length res) 0) then print_endline "true\n===========";
+              List.iter res ~f:(fun r -> print_endline r ; print_endline "==========");
               []
             )
     ]

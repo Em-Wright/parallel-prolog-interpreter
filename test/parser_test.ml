@@ -114,6 +114,9 @@ let parser_test_suite =
             );
 
             (* Rules *)
+            "pred(_, _,X) :- true.", (
+              Clause (TermExp ("pred", [VarExp "BLANK_1"; VarExp "BLANK_2"; VarExp "X"]), [TermExp ("true", [])])
+            );
             "cat :- true.", (
                 Clause (TermExp ("cat", []), [TermExp ("true", [])])
             );
@@ -126,7 +129,7 @@ let parser_test_suite =
                     ]
                 )
             );
-            "len( [A, B | T], N) :- len(T, M), N is M + 2.", (
+            "len( [A, _ | T], N) :- len(T, M), N is M + 2.", (
               Clause (
                 TermExp (
                   "len", [
@@ -135,7 +138,7 @@ let parser_test_suite =
                         VarExp "A";
                         TermExp (
                           "list", [
-                            VarExp "B";
+                            VarExp "BLANK_1";
                             VarExp "T"
                           ]
                         )

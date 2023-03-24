@@ -41,6 +41,7 @@ let string_of_token t =
     | LBRACKET -> "LBRACKET"
     | PIPE     -> "PIPE"
     | CUT      -> "CUT"
+    | UNDERSCORE -> "UNDERSCORE"
 
 let string_of_token_list tl =
     "[" ^ (String.concat "; " (List.map string_of_token tl)) ^ "]"

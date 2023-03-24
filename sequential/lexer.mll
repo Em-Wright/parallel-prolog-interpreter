@@ -44,7 +44,7 @@ let digits = digit +
 let integers = sign ? digits
 
 (* Variables *)
-let variable = (upper_case | underline) alphanumerical *
+let variable = (upper_case) alphanumerical *
 
 rule token = parse
     (* Meta-characters *)
@@ -88,6 +88,7 @@ rule token = parse
     | ">="              { GEQ       }
     | "<="              { LEQ       }
     | "!"               { CUT       }
+    | "_"               { UNDERSCORE}
 
 and comments count = parse
     | open_comment      { comments (1 + count) lexbuf }

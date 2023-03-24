@@ -18,7 +18,7 @@ let eval_query (b, db, _ ) _vars =
         )
   in
   let var_mapping = String.Table.create () in
-  let b_converted : Exp.t ref list = List.map b ~f:(fun e -> convert e var_mapping |> ref ) in
+  let b_converted : (Exp.t ref * int) list = List.map b ~f:(fun e -> convert e var_mapping |> ref , 0) in
   let trail = Stack.create () in
   let res, _ = eval_query b_converted db_converted trail var_mapping in
   let res_str =

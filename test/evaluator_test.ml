@@ -54,7 +54,7 @@ let evaluator_test_suite =
             (string_of_res
                 (eval_query
                     (
-                        [TermExp ("true", [])],
+                        [TermExp ("true", []), 0],
                         [],
                         []
                       ) String.Set.empty
@@ -67,7 +67,7 @@ let evaluator_test_suite =
             (string_of_res
                 (eval_query
                     (
-                        [TermExp ("male", [TermExp ("elizabeth", [])])],
+                        [TermExp ("male", [TermExp ("elizabeth", [])]), 0],
                         [],
                         []
                     ) String.Set.empty
@@ -79,7 +79,7 @@ let evaluator_test_suite =
             (string_of_res
                 (eval_query
                     (
-                        [TermExp ("parent", [VarExp "X"; TermExp ("charles1", [])])],
+                        [TermExp ("parent", [VarExp "X"; TermExp ("charles1", [])]),0],
                         [],
                         []
                     ) (String.Set.of_list ["X"])
@@ -91,7 +91,7 @@ let evaluator_test_suite =
             (string_of_res
                 (eval_query
                     (
-                        [TermExp ("male", [TermExp ("elizabeth", [])])],
+                        [TermExp ("male", [TermExp ("elizabeth", [])]), 0],
                         [Clause (TermExp("female", [TermExp("elizabeth", [TermExp ("true", [])])]), [])],
                         []
                     ) String.Set.empty
@@ -103,7 +103,7 @@ let evaluator_test_suite =
             (string_of_res
                 (eval_query
                     (
-                        [TermExp ("male", [TermExp ("elizabeth", [])])],
+                        [TermExp ("male", [TermExp ("elizabeth", [])]), 0],
                         [Clause (TermExp("elizabeth", [TermExp("male", [])]), [TermExp ("true", [])])],
                         []
                     ) String.Set.empty
@@ -115,7 +115,7 @@ let evaluator_test_suite =
             (string_of_res
                 (eval_query
                     (
-                        [TermExp ("female", [TermExp ("elizabeth", [])])],
+                        [TermExp ("female", [TermExp ("elizabeth", [])]), 0],
                         [Clause (TermExp("female", [TermExp("elizabeth", [])]), [TermExp ("true", [])])],
                         []
                     ) String.Set.empty
@@ -127,7 +127,7 @@ let evaluator_test_suite =
             (string_of_res
                 (eval_query
                     (
-                        [TermExp ("female", [TermExp ("elizabeth", [])])],
+                        [TermExp ("female", [TermExp ("elizabeth", [])]), 0],
                         [Clause (TermExp("female", [TermExp("elizabeth", [])]), [TermExp("true", [])])],
                         []
                     ) String.Set.empty
@@ -139,7 +139,7 @@ let evaluator_test_suite =
             (string_of_res
                 (eval_query
                     (
-                        [TermExp ("female", [TermExp ("elizabeth", [])])],
+                        [TermExp ("female", [TermExp ("elizabeth", [])]), 0],
                         [Clause (TermExp("female", [TermExp("elizabeth", [])]), [TermExp("true", [])])],
                         []
                     ) String.Set.empty
@@ -151,7 +151,7 @@ let evaluator_test_suite =
             (string_of_res
                 (eval_query
                     (
-                        [TermExp ("male", [TermExp ("elizabeth", [])])],
+                        [TermExp ("male", [TermExp ("elizabeth", [])]), 0],
                         [Query([TermExp ("male", [TermExp ("elizabeth", [])])]);
                          Clause (TermExp("female", [TermExp("elizabeth", [])]), [TermExp("true", [])])],
                         []
@@ -164,7 +164,7 @@ let evaluator_test_suite =
             (string_of_res
                 (eval_query
                     (
-                        [TermExp("age", [TermExp("zaid",[]); VarExp "Y"])],
+                        [TermExp("age", [TermExp("zaid",[]); VarExp "Y"]), 0],
                         [],
                         []
                     )
@@ -177,7 +177,7 @@ let evaluator_test_suite =
             (string_of_res
                 (eval_query
                     (
-                        [TermExp("age", [TermExp("zaid",[]); VarExp "Y"])],
+                        [TermExp("age", [TermExp("zaid",[]); VarExp "Y"]), 0],
                         [Clause (TermExp ("age", [ TermExp ("adam", []);
                               IntExp 10]), [TermExp ("true", [])])],
                         []
@@ -192,7 +192,7 @@ let evaluator_test_suite =
             (string_of_res
                 (eval_query
                     (
-                        [TermExp("age", [VarExp "E"; VarExp "Z"])],
+                        [TermExp("age", [VarExp "E"; VarExp "Z"]), 0],
                         [Clause (TermExp ("age", [TermExp ("adam", []);
                               IntExp 10]), [TermExp ("true", [])]);Clause (TermExp ("age", [TermExp ("zaid", []);  (IntExp 5)]), [TermExp ("true", [])])],
                         []
@@ -206,7 +206,7 @@ let evaluator_test_suite =
             (string_of_res
                 (eval_query
                     (
-                        [TermExp("age", [VarExp "X";  (IntExp 5)])],
+                        [TermExp("age", [VarExp "X";  (IntExp 5)]), 0],
                         [Clause (TermExp ("age", [TermExp ("adam", []);
                             IntExp 10]), [TermExp ("true", [])]);Clause (TermExp ("age", [TermExp ("zaid", []);  (IntExp 5)]), [TermExp ("true", [])])],
                         []
@@ -220,7 +220,7 @@ let evaluator_test_suite =
             (string_of_res
                 (eval_query
                     (
-                        [TermExp ("a", [])],
+                        [TermExp ("a", []), 0],
                         [Clause (TermExp ("a", []), [TermExp ("true", [])])],
                         []
                     )
@@ -240,7 +240,7 @@ let evaluator_test_suite =
                              TermExp ("empty_list", [])
                            ]);
                          VarExp "X"
-                       ])],
+                       ]), 0],
                     [
                       Clause (TermExp ("prepend", [VarExp "H"; VarExp "T";
                                                    TermExp ("list", [
@@ -262,7 +262,7 @@ let evaluator_test_suite =
             (string_of_res
                (eval_query
                   (
-                    [TermExp("nat1", [VarExp "Z"])],
+                    [TermExp("nat1", [VarExp "Z"]), 0],
                     [
                       Clause (TermExp("nat", [IntExp 0]), [TermExp("true", [])]);
                       Clause (TermExp("nat1", [VarExp "X"]), [
@@ -281,7 +281,7 @@ let evaluator_test_suite =
             (string_of_res
                (eval_query
                   (
-                    [TermExp("is_ten", [VarExp "Z"])],
+                    [TermExp("is_ten", [VarExp "Z"]), 0],
                     [
                       Clause (TermExp("is_one", [IntExp 1]), [TermExp("true", [])]);
                       Clause (TermExp("is_ten", [VarExp "X"]), [
@@ -300,7 +300,7 @@ let evaluator_test_suite =
             (string_of_res
                (eval_query
                   (
-                    [TermExp("is_five", [VarExp "Z"])],
+                    [TermExp("is_five", [VarExp "Z"]),0],
                     [
                       Clause (TermExp("is_minus_ten", [IntExp (-10)]), [TermExp("true", [])]);
                       Clause (TermExp("is_five", [VarExp "X"]), [
@@ -320,7 +320,7 @@ let evaluator_test_suite =
             (string_of_res
                (eval_query
                   (
-                    [TermExp("nat", [VarExp "Z"])],
+                    [TermExp("nat", [VarExp "Z"]), 0],
                     [
                       Clause (TermExp("nat", [VarExp "X"]), [
                             TermExp("equals", [VarExp "X"; IntExp 0])
@@ -348,7 +348,7 @@ let evaluator_test_suite =
             (string_of_res
                (eval_query
                   (
-                    [TermExp("not_two", [VarExp "Z"])],
+                    [TermExp("not_two", [VarExp "Z"]), 0],
                     [
                       Clause (TermExp("nat", [IntExp (1)]), [TermExp("true", [])]);
                       Clause (TermExp("nat", [IntExp (2)]), [TermExp("true", [])]);
@@ -378,7 +378,7 @@ let evaluator_test_suite =
             (string_of_res
                (eval_query
                   (
-                    [TermExp("nat1", [VarExp "Z"])],
+                    [TermExp("nat1", [VarExp "Z"]), 0],
                     [
                       Clause (TermExp("nat", [IntExp (-2)]), [TermExp("true", [])]);
                       Clause (TermExp("nat", [IntExp (-1)]), [TermExp("true", [])]);
@@ -408,7 +408,7 @@ let evaluator_test_suite =
             (string_of_res
                 (eval_query
                     (
-                        [TermExp("age", [VarExp "X"; VarExp "Y"]); TermExp("female", [VarExp "X"])],
+                        [TermExp("age", [VarExp "X"; VarExp "Y"]), 0; TermExp("female", [VarExp "X"]), 0],
                         [Clause (TermExp ("age", [ TermExp("adam", []); IntExp 10]), [TermExp ("true", [])]);Clause (TermExp ("age", [TermExp ("zaid", []);  (IntExp 5)]), [TermExp ("true", [])]); Clause (TermExp ("age", [TermExp ("ann", []);  (IntExp 12)]), [TermExp ("true", [])]); Clause (TermExp ("male", [TermExp ("zaid", [])]), [TermExp ("true", [])]); Clause (TermExp ("male", [ TermExp("adam", [])]), [TermExp ("true", [])]); Clause (TermExp ("female", [TermExp ("ann",[])]),[TermExp ("true", [])])],
                         []
                     )
@@ -421,7 +421,7 @@ let evaluator_test_suite =
             (string_of_res
                 (eval_query
                     (
-                        [TermExp("sibling", [TermExp("sally",[]); TermExp("erica",[])])],
+                        [TermExp("sibling", [TermExp("sally",[]); TermExp("erica",[])]), 0],
                         [Clause (TermExp ("parent_child", [VarExp "X"; VarExp "Y"]), [TermExp ("mother_child", [VarExp "X"; VarExp "Y"])]); Clause (TermExp ("parent_child", [VarExp "X"; VarExp "Y"]), [TermExp ("father_child", [VarExp "X"; VarExp "Y"])]); Clause (TermExp ("sibling", [VarExp "X"; VarExp "Y"]), [TermExp ("parent_child", [VarExp "Z"; VarExp "X"]); TermExp ("parent_child", [VarExp "Z"; VarExp "Y"])]); Clause (TermExp ("father_child", [TermExp ("mike", []); TermExp ("tom", [])]), [TermExp ("true", [])]); Clause (TermExp ("father_child", [TermExp ("tom", []); TermExp ("erica", [])]), [TermExp ("true", [])]); Clause (TermExp ("father_child", [TermExp ("tom", []); TermExp ("sally", [])]), [TermExp ("true", [])]); Clause (TermExp ("mother_child", [TermExp ("trude", []); TermExp ("sally", [])]), [TermExp ("true", [])])],
                         []
                     )
@@ -434,7 +434,7 @@ let evaluator_test_suite =
             (string_of_res
                 (eval_query
                     (
-                        [TermExp("sibling", [VarExp "Z"; VarExp "E"])],
+                        [TermExp("sibling", [VarExp "Z"; VarExp "E"]), 0],
                         [Clause (TermExp ("parent_child", [VarExp "X"; VarExp "Y"]), [TermExp ("mother_child", [VarExp "X"; VarExp "Y"])]); Clause (TermExp ("parent_child", [VarExp "X"; VarExp "Y"]), [TermExp ("father_child", [VarExp "X"; VarExp "Y"])]); Clause (TermExp ("sibling", [VarExp "X"; VarExp "Y"]), [TermExp ("parent_child", [VarExp "Z"; VarExp "X"]); TermExp ("parent_child", [VarExp "Z"; VarExp "Y"])]); Clause (TermExp ("father_child", [TermExp ("mike", []); TermExp ("tom", [])]), [TermExp ("true", [])]); Clause (TermExp ("father_child", [TermExp ("tom", []); TermExp ("erica", [])]), [TermExp ("true", [])]); Clause (TermExp ("father_child", [TermExp ("tom", []); TermExp ("sally", [])]), [TermExp ("true", [])]); Clause (TermExp ("mother_child", [TermExp ("trude", []); TermExp ("sally", [])]), [TermExp ("true", [])])],
                         []
                     )
@@ -473,7 +473,7 @@ true
             (string_of_res
                 (eval_query
                     (
-                        [TermExp("animal", [VarExp "X"; VarExp "Y"])],
+                        [TermExp("animal", [VarExp "X"; VarExp "Y"]), 0],
                         [Clause (TermExp ("animal", [VarExp "X"; VarExp "Y"]), [TermExp ("cat", [VarExp "X"])]); Clause (TermExp ("cat", [TermExp ("tom", [])]), [TermExp ("true", [])])],
                         []
                     )
@@ -486,7 +486,7 @@ true
             (string_of_res
                 (eval_query
                     (
-                        [TermExp("animal", [VarExp "X"; VarExp "Y"]); VarExp "Z"],
+                        [TermExp("animal", [VarExp "X"; VarExp "Y"]), 0; VarExp "Z", 0],
                         [Clause (TermExp ("animal", [VarExp "X"; VarExp "Y"]), [TermExp ("cat", [VarExp "X"])]); Clause (TermExp ("cat", [TermExp ("tom", [])]), [TermExp ("true", [])])],
                         []
                     )
@@ -499,7 +499,7 @@ true
             (string_of_res
                 (eval_query
                     (
-                        [VarExp "X"],
+                        [VarExp "X", 0],
                         [Clause (TermExp ("animal", [VarExp "X"; VarExp "Y"]), [TermExp ("cat", [VarExp "X"])]); Clause (TermExp ("cat", [TermExp ("tom", [])]), [TermExp ("true", [])])],
                         []
                     )
@@ -512,7 +512,7 @@ true
             (string_of_res
                 (eval_query
                     (
-                        [TermExp("animal", [VarExp "X"; VarExp "Y"]); VarExp "Z"],
+                        [TermExp("animal", [VarExp "X"; VarExp "Y"]), 0; VarExp "Z", 0],
                         [Clause (TermExp ("animal", [VarExp "X"; VarExp "Y"]), [TermExp ("cat", [VarExp "X"])]); Clause (TermExp ("cat", [TermExp ("tom", [])]), [TermExp ("true", [])])],
                         []
                     )
@@ -525,7 +525,7 @@ true
             (string_of_res
                 (eval_query
                     (
-                        [TermExp("animal", [VarExp "X"; VarExp "Y"]); VarExp "Z"],
+                        [TermExp("animal", [VarExp "X"; VarExp "Y"]), 0; VarExp "Z", 0],
                         [Clause (TermExp ("animal", [VarExp "X"; VarExp "Y"]), [TermExp ("cat", [VarExp "X"])]); Clause (TermExp ("cat", [TermExp ("tom", [])]), [TermExp ("true", [])])],
                         [(VarExp "X", TermExp("eh",[VarExp "X"]))]
                     )
@@ -538,7 +538,7 @@ true
             (string_of_res
                 (eval_query
                     (
-                        [TermExp("b", [TermExp("a", [TermExp("true",[])])])],
+                        [TermExp("b", [TermExp("a", [TermExp("true",[])])]), 0],
                         [Clause (TermExp("b",[VarExp "X"]), [TermExp("a", [VarExp "X"])]); Clause (TermExp("a",[TermExp("true",[])]), [TermExp ("true", [])])],
                         []
                     )
@@ -551,7 +551,7 @@ true
             (string_of_res
                (eval_query
                   (
-                    [TermExp("fib", [IntExp 5; VarExp "X"])],
+                    [TermExp("fib", [IntExp 5; VarExp "X"]), 0],
                     [
                       Clause (TermExp("fib", [IntExp 0; IntExp 1]), [ TermExp ("cut", [])]);
                       Clause (TermExp("fib", [IntExp 1; IntExp 1]), [ TermExp ("cut", [])]);

@@ -51,7 +51,7 @@ let lexer_test_suite =
 
             (* Variables *)
             "Cats",     [VAR "Cats"];
-            "_dogs",    [VAR "_dogs"];
+            "D_ogs",    [VAR "D_ogs"];
             "FOOBAR",   [VAR "FOOBAR"];
 
             (* Symbols *)

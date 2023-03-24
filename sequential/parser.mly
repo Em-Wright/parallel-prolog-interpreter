@@ -18,6 +18,14 @@
             a,
             []
         )
+
+    let fresh =
+      let ctr = ref 0 in
+      let f () = ( ctr := !ctr + 1; "BLANK_"^(string_of_int !ctr)) in
+      f
+
+    let varcheck v =
+      if String.equal v "_" then fresh () else v
 %}
 
 /* Refer to:
@@ -58,6 +66,7 @@
 %token GEQ
 %token LEQ
 %token CUT
+%token UNDERSCORE
 
 /* Meta-characters */
 %token EOF
@@ -116,11 +125,13 @@ term:
     | s = structure                                     { s }
     | a = arithmetic                                    { a }
     | c = comparable                                    { c }
+    | UNDERSCORE                                        { VarExp (fresh ()) }
     | l = list                                          { l }
 
 comparable:
     | i = INT { IntExp i }
-    | v = VAR { VarExp v }
+    | v = VAR { VarExp (varcheck v) }
+    | UNDERSCORE {VarExp (fresh ())}
 
 arithmetic:
     | a1 = arithmetic_operand; PLUS; a2 = arithmetic_operand { ArithmeticExp (PLUS, a1, a2)}
@@ -130,4 +141,5 @@ arithmetic:
 
 arithmetic_operand:
     | i = INT                                           { ArithmeticInt i}
-    | v = VAR                                           { ArithmeticVar v}
+    | v = VAR                                           { ArithmeticVar (varcheck v)}
+    | UNDERSCORE                                        { ArithmeticVar (fresh ())}
