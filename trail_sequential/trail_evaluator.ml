@@ -287,7 +287,6 @@ let rec resolve (e : Exp.t) =
     )
   | _ -> e
 
-
 let rec eval_query q db (trail : Trail.t) var_mapping =
   match q with
   | [] -> [solution_to_string var_mapping], []
@@ -301,7 +300,7 @@ let rec eval_query q db (trail : Trail.t) var_mapping =
         | TermExp("equals", [lhs; rhs]) -> (
             (* check if the lhs and rhs can unify *)
             let t = Trail.mark trail in
-            let res = 
+            let res =
               if unify lhs rhs trail then
                 eval_query gl db trail var_mapping
               else ([], [])
@@ -416,6 +415,7 @@ let rec eval_query q db (trail : Trail.t) var_mapping =
             loop db_copy ([],[]) )
         | _ -> eval_query gl db trail var_mapping
       )
+
 
 let arithmetic_convert (t : Ast.arithmetic_operand) (var_mapping : Exp.t Var.t String.Table.t) : Exp.t Arithmetic_operand.t =
   match t with

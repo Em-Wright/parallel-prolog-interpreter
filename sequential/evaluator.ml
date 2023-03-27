@@ -212,7 +212,9 @@ let command =
        in
        fun () ->
          Interface.main filename ~eval_function:(fun db b ->
-             let b2 = List.zip_exn b (List.init (List.length b) ~f:(fun _ -> 0)) in
              let orig_vars = find_vars_string b |> String.Set.of_list in
-             let (res,_) = eval_query (b2, db, []) orig_vars in res )
+             let b2 = List.zip_exn b (List.init (List.length b) ~f:(fun _ -> 0)) in
+             let (res,_) = eval_query (b2, db, []) orig_vars in
+             res
+           )
     ]

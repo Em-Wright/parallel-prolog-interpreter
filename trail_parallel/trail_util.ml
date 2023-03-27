@@ -37,6 +37,11 @@ module Var = struct
     | None -> "Var_" ^ name
     | Some x -> (f !x)
 
+  let to_soln_string ({name=_; instance} : 'a t) (f : 'a -> string) =
+    match instance with
+    | None -> "is free"
+    | Some x -> f !x
+
   let get_all_var_names ({name;instance} : 'b serialisable) ( f : 'b -> string list -> string list) acc =
     match instance with
     | None -> name::acc
@@ -159,6 +164,19 @@ module Exp = struct
                           * serialisable Arithmetic_operand.serialisable
     [@@deriving bin_io]
 
+    let rec resolve_instance (e : t) : t =
+      match e with
+      | VarExp v -> (
+          match !v.instance with
+          | Some e -> (
+              match !e with
+              | VarExp _ -> resolve_instance !e
+              | _ -> !e
+            )
+          | None -> e
+        )
+      | _ -> e
+
     let operator_to_string (t : Ast.arithmetic_operator) =
       match t with
       | PLUS -> " + "
@@ -167,12 +185,36 @@ module Exp = struct
       | DIV -> " / "
 
     let rec to_string (t : t) =
+      let readable_string_of_list list_exp =
+        let rec inner_string list_exp =
+          match list_exp with
+          | TermExp ("empty_list", []) -> ""
+          | TermExp ("list", [element; rest]) ->(
+            let resolved = resolve_instance !rest in
+            match resolved with
+            | TermExp ("empty_list", _) -> to_string !element
+            | TermExp ("list", _) ->
+              let rest_of_string = inner_string resolved in
+              (to_string !element) ^ ", " ^ rest_of_string
+            | _ -> ""
+          )
+          | VarExp v -> Var.to_string !v to_string
+          | _ -> "This is not a list, but has been given to the readable_string_of_list function"
+        in
+        "[" ^ (inner_string list_exp) ^ "]"
+      in
       match t with
-      | VarExp v -> Var.to_string !v to_string
+      | VarExp v -> (Var.to_soln_string !v to_string)
       | IntExp i -> Int.to_string i
       | TermExp (name, args) ->
-        let arg_string = List.fold args ~init:"" ~f:(fun acc arg -> acc ^ (to_string !arg) ^ ", ") in
-        name ^ "(" ^ arg_string ^ ")"
+        ( match name with
+          | "list" | "empty_list" -> readable_string_of_list t
+          | _ -> if List.length args > 0 then
+              let arg_string = List.fold args ~init:"" ~f:(fun acc arg -> acc ^ (to_string !arg) ^ ", ") in
+              name ^ "(" ^ arg_string ^ ")"
+            else
+              name
+        )
       | ArithmeticExp (operator, op1, op2 ) ->
         (Arithmetic_operand.to_string op1 to_string)
         ^ (operator_to_string operator)
@@ -195,22 +237,10 @@ module Exp = struct
         ^ (operator_to_string operator)
         ^ (Arithmetic_operand.serialisable_to_string op2 serialisable_to_string)
 
-    let rec resolve_to_furthest_instance (e : t) : t =
-      match e with
-      | VarExp v -> (
-          match !v.instance with
-          | Some e -> (
-              match !e with
-              | VarExp _ -> resolve_to_furthest_instance !e
-              | _ -> !e
-            )
-          | None -> e
-        )
-      | _ -> e
 
     let rec serialise (t : t) : serialisable =
       match t with
-      | VarExp v -> Var.serialise !v resolve_to_furthest_instance serialise |> VarExpS
+      | VarExp v -> Var.serialise !v resolve_instance serialise |> VarExpS
       | IntExp i -> IntExpS i
       | TermExp (name, args) -> let args = List.map args ~f:(fun a -> serialise !a) in
         TermExpS (name, args)

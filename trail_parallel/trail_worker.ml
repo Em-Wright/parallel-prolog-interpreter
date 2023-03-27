@@ -19,7 +19,7 @@ module Job = struct
   let serialise ({goals;var_mapping;path} : t) : serialisable =
     let goals = List.map goals ~f:(fun (g, d) -> Exp.serialise !g, d) in
     let var_mapping = Hashtbl.map var_mapping ~f:(fun v ->
-        Var.serialise v Exp.resolve_to_furthest_instance Exp.serialise
+        Var.serialise v Exp.resolve_instance Exp.serialise
       ) in
     {goals; var_mapping; path}
 
