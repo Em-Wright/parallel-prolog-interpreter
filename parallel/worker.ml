@@ -212,6 +212,9 @@ module T = struct
           )
         (* if goal is some other predicate *)
         | TermExp(_,_) -> (
+            (* TODO - could we check here for whether we need to stop iterating due to cut and then we
+            don't need to return that specific cut? No because we don't know that it's a cut until we
+            next evaluate it by one step *)
             List.foldi db ~init:[]
               ~f:(fun i acc rule ->
                   match (rename_vars_in_dec rule) with

@@ -3,102 +3,6 @@ open Async
 open Include
 open Trail_util
 
-module Job = struct
-  type t = {
-    goals : (Exp.t ref * int) list;
-    var_mapping : Exp.t Var.t String.Table.t;
-    path : (int*int) list
-  } [@@deriving fields]
-
-  type serialisable = {
-    goals : (Exp.serialisable * int) list;
-    var_mapping : Exp.serialisable Var.serialisable String.Table.t;
-    path : (int*int) list
-  } [@@deriving bin_io]
-
-  let serialise ({goals;var_mapping;path} : t) : serialisable =
-    let goals = List.map goals ~f:(fun (g, d) -> Exp.serialise !g, d) in
-    let var_mapping = Hashtbl.map var_mapping ~f:(fun v ->
-        Var.serialise v Exp.resolve_instance Exp.serialise
-      ) in
-    {goals; var_mapping; path}
-
-
-  let deserialise ({goals; var_mapping; path} : serialisable) : t =
-    let all_var_names = List.fold goals ~init:[] ~f:(fun acc (g,_) ->
-        Exp.get_all_var_names g acc
-      ) |> String.Set.of_list
-    in
-    let temp_var_mapping =
-      match String.Table.create_mapped (String.Set.to_list all_var_names) ~get_key:Fn.id
-        ~get_data:(fun r -> Var.create_named r) with
-      | `Ok tbl -> tbl
-      | `Duplicate_keys _ -> raise_s (Sexp.of_string "Duplicate keys when deserialising")
-    in
-    let var_mapping = Hashtbl.map var_mapping ~f:(fun v_serialised ->
-        Var.deserialise v_serialised Exp.deserialise temp_var_mapping
-      )
-    in
-    let goals = List.map goals ~f:(fun (goal, d) ->
-        (Exp.deserialise goal temp_var_mapping |> ref , d)
-      )
-    in
-    {goals; var_mapping; path}
-
-  let deep_copy ({goals; var_mapping; path} : t) : t =
-    let var_translation = String.Table.create () in
-    let new_var_mapping = String.Table.map var_mapping ~f:(fun v ->
-        Var.deep_copy v (fun e -> Exp.deep_copy e var_translation) var_translation
-      )
-    in
-    let new_goals = List.map goals ~f:(fun (e,d) -> Exp.reref_vars !e var_translation |> ref, d) in
-    {goals=new_goals; var_mapping=new_var_mapping; path}
-end
-
-module Job_and_nxt = struct
-  type t = Job.serialisable * int [@@deriving bin_io]
-end
-
-module Job_and_bool = struct
-  type t = Job.serialisable * int * bool [@@deriving bin_io]
-end
-
-module Results = struct
-  type t = ((string * string) list * (int*int) list) list [@@deriving bin_io]
-
-  let reverse_path_order t : t =
-    List.map t ~f:( fun (env, path) -> (env, List.rev path))
-end
-
-module Worker_to_toplevel = struct
-  type t =
-    Results of Results.t
-    | Job of Job_and_nxt.t
-    | Cut of (int*int) list
-  [@@deriving bin_io]
-end
-
-module Toplevel_to_worker = struct
-  type t =
-    Work_request
-    | Cut of (int*int) list
-  [@@deriving bin_io]
-end
-
-let remove_due_to_cut path cut_path =
-  let rec loop p cp =
-    match p, cp with
-    | (x,dx)::_, (y, dy)::[] -> if x > y && dx=dy then true else false
-    | (x,dx)::xs, (y, dy)::ys -> if x = y && dx=dy then loop xs ys else false
-    | _,_ -> false
-  in
-  loop path (List.rev cut_path)
-
-let rec truncate path depth =
-  match path with
-  | (_, d)::p -> if d > depth then truncate p depth else  path
-  | [] -> []
-
 module T = struct
 
   module Worker_state = struct
@@ -130,16 +34,6 @@ module T = struct
      jobs to be done.
   *)
 
-  (* TODO going to need to keep track of locations of cuts, and remove any results from the cut at the end.
-  Can potentially identify which jobs not to bother with if we know in advance
-     X add Some/None path to the return of this function
-     - have the main function send and receive Cut messages - might need to make a separate Toplevel_to_worker
-     module which has cut messages and work requests
-     - have the main function remove jobs with paths which will be removed by a cut (need to figure out
-     what these paths are exactly)
-     - have function remove results with paths which will be removed by a cut (as well as the main
-     process double checking)
-  *)
   let eval (job : Job.t) db : Job.t list * (int*int) list option =
       match job.goals with
       | [] -> [], None

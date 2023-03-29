@@ -16,15 +16,23 @@ open Util
          - otherwise, each element is a list of substitutions for one solution
            to the query with the given db
 *)
-let rec eval_inner q db results =
+let rec eval_inner q db results orig_vars =
   match Deque.dequeue_back q with
   | None ->  results    (* no more of the tree to search so finished *)
-  | Some ([], env) -> eval_inner q db (env::results) (* No further subgoals to prove in this job
+  | Some ([], env) -> eval_inner q db (env::results) orig_vars (* No further subgoals to prove in this job
                                                      so add the substitution to the results *)
                         (* TODO would it make more sense to just keep the relevant parts of the environment e.g.
                         only the stuff relevant to variables we started with?
                         *)
   | Some (g1::gl, env) -> ((
+      let vars_set_string = String.Set.of_list (find_vars_string (g1::gl)) |> String.Set.union orig_vars in
+      let env =
+        List.filter env ~f:(fun (v, _) ->
+            match v with
+            | VarExp elt -> String.Set.exists vars_set_string ~f:(fun a -> String.equal elt a)
+            | _ -> false
+          )
+      in
       (* we have at least one more subgoal (g1) to prove in this job *)
       match g1 with
       | TermExp("true", []) -> Deque.enqueue_back q (gl, env)
@@ -152,13 +160,14 @@ let rec eval_inner q db results =
       (* subgoal g1 isn't a TermExp *)
       | _ -> Deque.enqueue_back q (gl, env)
     );
-     eval_inner q db results
+     eval_inner q db results orig_vars
     )
 
 let eval_query b db =
   let q = Deque.create () in
   Deque.enqueue_front q (b, []);
-  eval_inner q db []
+  let orig_vars = find_vars_string b |> String.Set.of_list in
+  eval_inner q db [] orig_vars
 
 let command =
   Command.basic
@@ -170,5 +179,6 @@ let command =
           "file"
           (required string)
       in
-      fun () -> Interface.main filename ~eval_function:(fun db b -> eval_query b db )
+      fun () -> Interface.main filename ~eval_function:(fun db b ->
+          eval_query b db )
     ]

@@ -1,7 +1,3 @@
-
-
-
-
 open OUnit2
 open Trail_parallel.Trail_util
 open Core

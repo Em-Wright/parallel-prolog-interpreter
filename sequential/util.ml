@@ -16,7 +16,10 @@ exception FAILED_SUBSTITUTION of string
 *)
 let (fresh, reset) =
     let nxt = ref 0 in
-    let f () = (nxt := !nxt + 1; string_of_int (!nxt)) in
+    let f () = (nxt := !nxt + 1;
+                (* if !nxt > 125000 then *)
+                (* print_endline ("Fresh var:"^(string_of_int !nxt)) ; *)
+                string_of_int (!nxt)) in
     let r () = nxt := 0 in
     (f, r)
 
