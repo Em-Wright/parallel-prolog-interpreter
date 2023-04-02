@@ -1,5 +1,6 @@
 open Core
 open Ast
+open! Common
 open Util
 
 (*
@@ -21,9 +22,6 @@ let rec eval_inner q db results orig_vars =
   | None ->  results    (* no more of the tree to search so finished *)
   | Some ([], env) -> eval_inner q db (env::results) orig_vars (* No further subgoals to prove in this job
                                                      so add the substitution to the results *)
-                        (* TODO would it make more sense to just keep the relevant parts of the environment e.g.
-                        only the stuff relevant to variables we started with?
-                        *)
   | Some (g1::gl, env) -> ((
       let vars_set_string = String.Set.of_list (find_vars_string (g1::gl)) |> String.Set.union orig_vars in
       let env =

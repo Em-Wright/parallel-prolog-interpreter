@@ -98,7 +98,6 @@ let trail_util_test_suite =
         ), "Var_X + Var_Y";
 
 
-
         (* TODO - actually write the tests *)
 
         (* need testing for get_furthest_instance, occurs, unify, resolve,

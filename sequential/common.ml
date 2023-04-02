@@ -135,7 +135,7 @@ let rec readable_string_of_exp e =
     "[" ^ (inner_string list_exp) ^ "]"
   in
     match e with
-    | VarExp   v     -> v
+    | VarExp   v     -> "Var_"^v
     | IntExp   i     -> string_of_int i
     | TermExp (s, l) -> (
       match s with

@@ -626,16 +626,15 @@ end
 
 module Worker_to_toplevel = struct
   type t =
-    Results of Results.t
+    Results_and_cuts of Results.t * ((int*int) list list)
     | Job of Job_and_nxt.t
-    | Cut of (int*int) list
   [@@deriving bin_io]
 end
 
 module Toplevel_to_worker = struct
   type t =
     Work_request
-    | Cut of (int*int) list
+    | Cuts of (int*int) list list
   [@@deriving bin_io]
 end
 
