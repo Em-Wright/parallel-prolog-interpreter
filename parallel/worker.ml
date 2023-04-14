@@ -60,7 +60,9 @@ end
 
 module Worker_to_toplevel = struct
   type t =
-    Results_and_cuts of Results.t * ((int*int) list list)
+    (* Results_and_cuts of Results.t * ((int*int) list list) *)
+      Results of Results.t
+    | Cut of (int * int) list
     | Job of Job_and_nxt.t
   [@@deriving bin_io]
 end
@@ -68,7 +70,7 @@ end
 module Toplevel_to_worker = struct
   type t =
     Work_request
-    | Cuts of (int*int) list list
+    | Cut of (int*int) list
   [@@deriving bin_io]
 end
 
@@ -76,6 +78,7 @@ let remove_due_to_cut path cut_path =
   let rec loop p cp =
     match p, cp with
     | (x,dx)::_, (y, dy)::[] -> if x > y && dx=dy then true else false
+    | (x,dx)::xs, (y, dy)::ys::[] -> if x > y && dx=dy then true else loop xs [ys]
     | (x,dx)::xs, (y, dy)::ys -> if x = y && dx=dy then loop xs ys else false
     | _,_ -> false
   in
@@ -83,7 +86,7 @@ let remove_due_to_cut path cut_path =
 
 let rec truncate path depth =
   match path with
-  | (_, d)::p -> if d > depth then truncate p depth else  path
+  | (_, d)::p -> if d > (depth+1) then truncate p depth else  path
   | [] -> []
 
 module T = struct
@@ -126,7 +129,7 @@ module T = struct
         | TermExp ("false", []) -> [], None
         | TermExp("true", []) -> [ (gl, env, path)], None
         | TermExp("cut", []) ->
-          let truncated = truncate path (depth ) in
+          let truncated = truncate path (depth) in
           [(gl, env, path)], Some truncated
         | TermExp("equals", [lhs; rhs]) -> (
             match unify [(lhs, rhs)] with
@@ -285,9 +288,9 @@ module T = struct
       in
       Deque.enqueue_back worker_state.q {goals; env; path=path2}
     in
-    let init_results, init_cuts = match Deque.dequeue_back worker_state.q with
-    | None -> [], []
-    | Some {goals =[]; env; path} -> [(env, path)], []
+    let init_results = match Deque.dequeue_back worker_state.q with
+    | None -> []
+    | Some {goals =[]; env; path} -> [(env, path)]
     | Some {goals; env; path} -> (
         let jobs, cut =
           ( eval goals env worker_state.db path) in
@@ -299,11 +302,12 @@ module T = struct
                   if not (remove_due_to_cut path2 cut) then (
                     handle_job (goals, env, path2)
                 ));
-            [], [cut]
+            don't_wait_for (Pipe.write worker_state.writer (Cut cut));
+            []
           | None ->
             List.iter jobs
               ~f:( fun (goals, env, path2) -> handle_job (goals, env, path2));
-            [], []
+            []
         )
       )
     in
@@ -319,7 +323,7 @@ module T = struct
     let%bind _ =
     if send_initial_jobs_bool then loop_send_jobs () else Deferred.unit
         in
-    let rec main_inner (results : ((exp * exp) list * (int*int) list) list) cuts =
+    let rec main_inner (results : ((exp * exp) list * (int*int) list) list) =
       let%bind _check_for_requests =
         (* NOTE - if you ever use a `read' function to check if there's
            anything in the pipe, make sure to use read_now - `read' waits
@@ -327,13 +331,11 @@ module T = struct
         *)
           match Pipe.peek worker_state.reader with
           | None -> Deferred.unit
-          | Some (Cuts cuts) -> 
+          | Some (Cut cut) -> 
             Deque.iteri worker_state.q
               ~f:(fun i job ->
-                  List.iter cuts ~f:(fun cut ->
                   if remove_due_to_cut job.path cut then
                     Deque.set_exn worker_state.q i ({job with goals=[TermExp("false", []), 0]})
-                    )
                 );
             Deferred.unit
           | Some Work_request -> (
@@ -350,8 +352,8 @@ module T = struct
       in
       match Deque.dequeue_back worker_state.q with
       | None ->
-        Pipe.write worker_state.writer (Results_and_cuts ( (Results.reverse_path_order results), cuts))
-      | Some {goals =[]; env; path} -> main_inner ((env, path)::results) cuts
+        Pipe.write worker_state.writer (Results  (Results.reverse_path_order results))
+      | Some {goals =[]; env; path} -> main_inner ((env, path)::results)
       | Some {goals; env; path} -> (
           let jobs, cut =
             ( eval goals env worker_state.db path) in
@@ -363,15 +365,16 @@ module T = struct
                     if not (remove_due_to_cut path2 cut) then (
                       handle_job (goals, env, path2)
                     ));
-              main_inner results (cut::cuts)
+              don't_wait_for (Pipe.write worker_state.writer (Cut cut));
+              main_inner results
             | None ->
               List.iter jobs
                 ~f:( fun (goals, env, path2) -> handle_job (goals, env, path2));
-              main_inner results cuts
+              main_inner results
           )
         )
     in
-    main_inner init_results init_cuts
+    main_inner init_results
   ;;
 
 
@@ -551,13 +554,13 @@ let eval_query b worker_info_list =
     Pipe.write_without_pushback  (List.nth_exn worker_info_list index).writer Work_request;
     update_requested_work index true
   in
-  (* let send_cuts cuts index_of_sender = *)
-  (*   Deferred.List.iteri worker_info_list ~f:(fun index {conn=_; reader=_; writer} -> *)
-  (*       let has_work, _ = Hashtbl.find_exn have_work__requested_work index in *)
-  (*       if not (Int.equal index_of_sender index) && has_work *)
-  (*       then Pipe.write writer cuts else Deferred.unit *)
-  (*     ) *)
-  (* in *)
+  let send_cut cut index_of_sender =
+    Deferred.List.iteri worker_info_list ~f:(fun index {conn=_; reader=_; writer} ->
+        let has_work, _ = Hashtbl.find_exn have_work__requested_work index in
+        if not (Int.equal index_of_sender index) && has_work
+        then Pipe.write writer cut else Deferred.unit
+      )
+  in
 
   let spare_jobs = Queue.create () in
   let accumulated_results = ref [] in
@@ -579,14 +582,14 @@ let eval_query b worker_info_list =
             update_requested_work index false;
             Queue.enqueue spare_jobs job
           )
-        | `Ok (Results_and_cuts (results, cuts)) ->
+        | `Ok (Results results) ->
           Hashtbl.set have_work__requested_work ~key:index ~data:(false, false);
-          accumulated_results := (results@(!accumulated_results));
-          accumulated_cuts := cuts@(!accumulated_cuts)
+          accumulated_results := (results@(!accumulated_results))
+          (* accumulated_cuts := cuts@(!accumulated_cuts); *)
           (* don't_wait_for (send_cuts (Cuts cuts) index) *)
-        (* | `Ok (Cut cut) -> *)
-        (*   don't_wait_for (send_cut (Cut cut) index); *)
-        (*   accumulated_cuts := ([cut]@(!accumulated_cuts)) *)
+        | `Ok (Cut cut) ->
+          don't_wait_for (send_cut (Cut cut) index);
+          accumulated_cuts := ([cut]@(!accumulated_cuts))
       );
     (* give new_jobs to any idle workers and update have_work accordingly *)
     let idle = Hashtbl.filter have_work__requested_work ~f:(fun (b, _) -> not b) in

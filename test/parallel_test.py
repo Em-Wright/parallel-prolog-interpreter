@@ -130,9 +130,6 @@ Opening file ../prolog_programs/test_cut.pl
 ====================
 Y = bess
 ====================
-====================
-Y = jack
-====================
 true
 
 

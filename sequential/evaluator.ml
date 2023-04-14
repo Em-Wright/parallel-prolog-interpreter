@@ -178,9 +178,11 @@ let rec eval_query (q, db, env) orig_vars =
                                 in
                                 (
                                   match cut with
-                                  | d::cuts -> if Int.equal d depth then Stop (res @ r, cuts@acc_cuts)
+                                  | d::cuts ->
+                                    if Int.equal d depth then Stop (res @ r, cuts@acc_cuts)
+                                    else if d < depth then Stop (res @ r, (d::cuts)@acc_cuts)
                                     else (
-                                      if d > depth then print_endline "something has gone terribly wrong";
+                                      print_endline "something has gone terribly wrong";
                                       Continue (res @ r, cut@acc_cuts))
                                   | [] -> Continue (res @ r, acc_cuts)
                                 )

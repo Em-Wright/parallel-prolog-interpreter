@@ -10,7 +10,8 @@ def run_test(command, expected_output, test_no):
     if res == expected_output.strip():
         print ("test", test_no, "passed")
     else:
-        print (res)
+        print ("expected:\n" + expected_output)
+        print ("got:\n" + res)
         print ("test", test_no, "FAILED")
 
 
@@ -114,9 +115,6 @@ Opening file ../prolog_programs/test_cut.pl
 ?- p(Y).
 ===============
 Y = bess
-===============
-===============
-Y = jack
 ===============
 
 File contents loaded.

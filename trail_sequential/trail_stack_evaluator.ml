@@ -3,6 +3,7 @@ open Include
 open Trail_util
 
 let rec eval_inner (q : Job.t Deque.t) db results =
+  print_endline (Deque.length q |> string_of_int);
   match (Deque.dequeue_back q) with
   | None -> results
   | Some job -> (

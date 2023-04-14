@@ -83,7 +83,7 @@ module Exp = struct
         "[" ^ (inner_string list_exp) ^ "]"
       in
       match t with
-      | VarExp v -> (Var.to_soln_string !v to_string)
+      | VarExp v -> (Var.to_string !v to_string)
       | IntExp i -> Int.to_string i
       | TermExp (name, args) ->
         ( match name with
@@ -404,11 +404,13 @@ let rec eval_query q db (trail : Trail.t) var_mapping =
                            Trail.undo trail t;
                            (
                              match cut with
-                             | d::cuts -> if Int.equal d depth then (res2 @ res, cuts@acc_cuts)
+                             | d::cuts ->
+                               if Int.equal d depth then (res2 @ res, cuts@acc_cuts)
+                               else if d < depth then (res2 @ res, (d::cuts)@acc_cuts)
                                else (
-                                 if d > depth then print_endline "something has gone terribly wrong";
+                                 print_endline "something has gone terribly wrong";
                                  loop dbs (res2 @ res, cut@acc_cuts))
-                             | [] -> loop dbs(res2 @ res, acc_cuts)
+                             | [] -> loop dbs (res2 @ res, acc_cuts)
                            )
                           )
             in

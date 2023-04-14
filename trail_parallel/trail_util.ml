@@ -204,7 +204,7 @@ module Exp = struct
         "[" ^ (inner_string list_exp) ^ "]"
       in
       match t with
-      | VarExp v -> (Var.to_soln_string !v to_string)
+      | VarExp v -> (Var.to_string !v to_string)
       | IntExp i -> Int.to_string i
       | TermExp (name, args) ->
         ( match name with
@@ -626,7 +626,9 @@ end
 
 module Worker_to_toplevel = struct
   type t =
-    Results_and_cuts of Results.t * ((int*int) list list)
+    (* Results_and_cuts of Results.t * ((int*int) list list) *)
+      Results of Results.t
+    | Cut of (int * int) list
     | Job of Job_and_nxt.t
   [@@deriving bin_io]
 end
@@ -634,7 +636,7 @@ end
 module Toplevel_to_worker = struct
   type t =
     Work_request
-    | Cuts of (int*int) list list
+    | Cut of (int*int) list
   [@@deriving bin_io]
 end
 
@@ -642,6 +644,7 @@ let remove_due_to_cut path cut_path =
   let rec loop p cp =
     match p, cp with
     | (x,dx)::_, (y, dy)::[] -> if x > y && dx=dy then true else false
+    | (x,dx)::xs, (y, dy)::ys::[] -> if x > y && dx=dy then true else loop xs [ys]
     | (x,dx)::xs, (y, dy)::ys -> if x = y && dx=dy then loop xs ys else false
     | _,_ -> false
   in
@@ -649,5 +652,5 @@ let remove_due_to_cut path cut_path =
 
 let rec truncate path depth =
   match path with
-  | (_, d)::p -> if d > depth then truncate p depth else  path
+  | (_, d)::p -> if d > (depth+1) then truncate p depth else  path
   | [] -> []

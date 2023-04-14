@@ -68,11 +68,12 @@ let common_test_suite =
                ]; "print_db"), "print_db";
 
             (* Readable Expression Strings *)
-            readable_string_of_exp (VarExp "X"),             "X";
+            readable_string_of_exp (VarExp "X"),             "Var_X";
             readable_string_of_exp ( IntExp 5),  "5";
             readable_string_of_exp (
                 TermExp ("coord", [VarExp "X"; VarExp "Y"; VarExp "Z"])
-            ), "coord(X, Y, Z)";
+            ), "coord(Var_X, Var_Y, Var_Z)";
+
             readable_string_of_exp (
                 TermExp ("zaid", [])
             ), "zaid";
