@@ -613,8 +613,8 @@ module Job_and_nxt = struct
   type t = Job.serialisable * int [@@deriving bin_io]
 end
 
-module Job_and_bool = struct
-  type t = Job.serialisable * int * bool [@@deriving bin_io]
+module Job_to_send = struct
+  type t = Job.serialisable * int * bool * (int * int) list list [@@deriving bin_io]
 end
 
 module Results = struct

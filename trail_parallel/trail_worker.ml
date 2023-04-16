@@ -14,7 +14,8 @@ module T = struct
       index : int;
       mutable db : Clause.t list;
       mutable reader : Toplevel_to_worker.t Pipe.Reader.t;
-      mutable writer : Worker_to_toplevel.t Pipe.Writer.t
+      mutable writer : Worker_to_toplevel.t Pipe.Writer.t;
+      mutable accumulated_cuts : (int * int) list list
     } [@@deriving fields]
   end
 
@@ -172,6 +173,7 @@ module T = struct
         let jobs, cut = eval job worker_state.db in
         (match cut with
         | Some cut ->
+            Worker_state.set_accumulated_cuts worker_state (cut::worker_state.accumulated_cuts);
             List.iter jobs ~f:(fun new_job ->
               if not (remove_due_to_cut new_job.path cut) then Deque.enqueue_back worker_state.q new_job);
             Pipe.write_without_pushback worker_state.writer (Cut cut);
@@ -195,41 +197,50 @@ module T = struct
     let%bind _ =
     if send_initial_jobs_bool then loop_send_jobs () else Deferred.unit
         in
-    let rec main_inner (results : ((string * string) list * (int*int) list) list) =
-      let%bind _check_for_requests =
+    let rec main_inner (results : ((string * string) list * (int*int) list) list) work_request =
+      let work_request =
         (* NOTE - if you ever use a `read' function to check if there's
            anything in the pipe, make sure to use read_now - `read' waits
            until there's a value available.
         *)
-          match Pipe.peek worker_state.reader with
-          | None -> Deferred.unit
-          | Some (Cut cut) ->
-            (* if we want to remove a job as the result of a cut, set the goals to false - then
-            the next time it's evaluated, it will immediately terminate, with no results *)
-            Deque.iteri worker_state.q
-              ~f:(fun i job ->
-                  if remove_due_to_cut job.path cut then
-                    Deque.set_exn worker_state.q i ({job with goals=[ref (Exp.TermExp("false", [])), 0]})
-              );
-            Deferred.unit
-          | Some Work_request -> (
+          match Pipe.read_now' worker_state.reader with
+          | `Nothing_available -> work_request
+          | `Ok q ->
+            Queue.fold q ~init:work_request ~f:(fun acc msg ->
+              match msg with
+              | Cut cut ->  (
+                Worker_state.set_accumulated_cuts worker_state (cut::worker_state.accumulated_cuts);
+                Deque.iteri worker_state.q
+                  ~f:(fun i job ->
+                      if remove_due_to_cut (List.rev job.path) cut then (
+                        Deque.set_exn worker_state.q i ({job with goals=[ref (Exp.TermExp("false", [])), 0]})
+                    ));
+                acc )
+              | Work_request -> true
+            )
+          | `Eof -> false
+          in
+      let work_request = 
+        if work_request then (
               (* We only give out work if we have at least 2 jobs on our stack.
               Otherwise, we would give away all our work, and have to ask the
               toplevel for more *)
               if (Deque.length worker_state.q) > 1 then (
                 match Deque.dequeue_front worker_state.q with
-                | None -> Deferred.unit (* Should never happen *)
-                | Some job -> ignore (Pipe.read_now worker_state.reader);
-                  Pipe.write worker_state.writer (Job (Job.serialise job, fresh ()))
-              ) else Deferred.unit
+                | None -> true (* Should never happen *)
+                | Some job ->
+                  Pipe.write_without_pushback worker_state.writer ( Job ((Job.serialise job), fresh ()));
+                  false
+              ) else true
             )
+        else false
       in
       match Deque.dequeue_back worker_state.q with
       | None ->
             Pipe.write worker_state.writer (Results (Results.reverse_path_order results))
       | Some {goals =[]; var_mapping; path} ->
         let soln = realise_solution var_mapping in
-        main_inner ((soln, path)::results)
+        main_inner ((soln, path)::results) work_request
       | Some job -> (
           let jobs, cut = eval job worker_state.db in
           (match cut with
@@ -237,15 +248,15 @@ module T = struct
              List.iter jobs ~f:(fun new_job ->
                  if not (remove_due_to_cut new_job.path cut) then Deque.enqueue_back worker_state.q new_job);
              Pipe.write_without_pushback worker_state.writer (Cut cut);
-             main_inner results
+             main_inner results work_request
            | None -> List.iter jobs
                        ~f:( fun new_job ->
                            Deque.enqueue_back worker_state.q new_job );
-             main_inner results
+             main_inner results work_request
           )
         )
     in
-    main_inner init_results
+    main_inner init_results false
   ;;
 
 
@@ -261,11 +272,12 @@ module T = struct
         )
       );
       reader = Pipe.empty ();
-      writer = temp_writer
+      writer = temp_writer;
+      accumulated_cuts = []
     }
 
   type 'worker functions = {
-    eval_query : ('worker, Job_and_bool.t, unit) Rpc_parallel_edit.Function.t;
+    eval_query : ('worker, Job_to_send.t, unit) Rpc_parallel_edit.Function.t;
     update_db : ('worker, Clause.serialisable, unit) Rpc_parallel_edit.Function.t;
     worker_to_toplevel_pipe : ('worker, unit, Worker_to_toplevel.t Pipe.Reader.t) Rpc_parallel_edit.Function.t;
     toplevel_to_worker_pipe : ('worker, unit * Toplevel_to_worker.t Pipe.Reader.t, unit) Rpc_parallel_edit.Function.t
@@ -276,11 +288,20 @@ module T = struct
        with type worker_state := Worker_state.t
         and type connection_state := Connection_state.t) =
   struct
-    let eval_query_impl ~worker_state ~conn_state:() ((job : Job.serialisable), highest_var, send_initial_jobs_bool) =
+    let eval_query_impl ~worker_state ~conn_state:() ((job : Job.serialisable), highest_var, send_initial_jobs_bool, cuts) =
       update highest_var;
+      Worker_state.set_accumulated_cuts worker_state cuts;
       let job = Job.deserialise job in
-      Deque.enqueue_back (Worker_state.q worker_state) job;
-      main worker_state send_initial_jobs_bool
+      let remove = 
+        List.fold cuts ~init:false 
+          ~f:(fun acc cut -> 
+            acc || remove_due_to_cut (Job.path job |> List.rev) cut 
+          )
+      in
+      if not remove then (
+        Deque.enqueue_back (Worker_state.q worker_state) job;
+        main worker_state send_initial_jobs_bool
+      ) else (Pipe.write worker_state.writer (Results []))
     ;;
 
     let update_db_impl ~worker_state ~conn_state:() d =
@@ -299,7 +320,7 @@ module T = struct
     let eval_query =
       C.create_rpc
         ~f:eval_query_impl
-        ~bin_input:(Job_and_bool.bin_t)
+        ~bin_input:(Job_to_send.bin_t)
         ~bin_output:(Unit.bin_t)
         ()
 
@@ -411,6 +432,10 @@ let eval_query (job : Job.serialisable) worker_info_list =
   let have_work__requested_work = Hashtbl.of_alist_exn (module Int)
       (List.init num_workers ~f:(fun i -> (i, (false, false)))) in
 
+  let spare_jobs = Queue.create () in
+  let accumulated_results = ref [] in
+  let accumulated_cuts = ref [] in
+
   (* define helper functions *)
   let update_have_work index b =
     Hashtbl.update have_work__requested_work index ~f:(fun data_opt ->
@@ -432,7 +457,7 @@ let eval_query (job : Job.serialisable) worker_info_list =
         Connection.run_exn
           (Worker_info.conn (List.nth_exn worker_info_list index))
           ~f:(functions.eval_query)
-          ~arg:(job, n, b)
+          ~arg:(job, n, b, !accumulated_cuts)
       );
     update_have_work index true
   in
@@ -446,9 +471,6 @@ let eval_query (job : Job.serialisable) worker_info_list =
       )
   in
 
-  let spare_jobs = Queue.create () in
-  let accumulated_results = ref [] in
-  let accumulated_cuts = ref [] in
 
   (* start by giving work to the first worker, then requesting work if we have more than 1 worker *)
   let b = if num_workers > 1 then true else false in
@@ -458,18 +480,21 @@ let eval_query (job : Job.serialisable) worker_info_list =
 
   let rec eval_inner () =
     List.iteri worker_info_list ~f:(fun index {conn=_; reader; writer=_} ->
-        match Pipe.read_now reader with
+        match Pipe.read_now' reader with
         | `Nothing_available -> ()
         | `Eof -> print_endline ("Pipe closed unexpectedly in worker "^ (Int.to_string index))
-        | `Ok (Job job) -> (
+        | `Ok q -> Queue.iter q ~f:(fun msg -> 
+          match msg with 
+        |(Job job) -> (
             update_requested_work index false;
             Queue.enqueue spare_jobs job
           )
-        | `Ok (Results results) ->
+        | (Results results) ->
           Hashtbl.set have_work__requested_work ~key:index ~data:(false, false);
           accumulated_results := (results@(!accumulated_results))
-        | `Ok (Cut cut) -> don't_wait_for (send_cut (Cut cut) index);
+        | (Cut cut) -> don't_wait_for (send_cut (Cut cut) index);
           accumulated_cuts := ([cut]@(!accumulated_cuts))
+          )
       );
     (* give new_jobs to any idle workers and update have_work accordingly *)
     let idle = Hashtbl.filter have_work__requested_work ~f:(fun (b, _) -> not b) in
