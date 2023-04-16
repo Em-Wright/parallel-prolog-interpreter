@@ -1,306 +1,605 @@
 import csv
 
-in_string = """./bin/parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.31s user 0.15s system 29% cpu 1.575 total
-./bin/parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.31s user 0.12s system 28% cpu 1.514 total
-./bin/parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.31s user 0.12s system 28% cpu 1.502 total
-./bin/parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.31s user 0.12s system 28% cpu 1.501 total
-./bin/parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.31s user 0.12s system 28% cpu 1.511 total
-./bin/parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.31s user 0.12s system 28% cpu 1.505 total
-./bin/parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.32s user 0.12s system 29% cpu 1.516 total
-./bin/parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.31s user 0.12s system 28% cpu 1.513 total
-./bin/parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.30s user 0.11s system 27% cpu 1.508 total
-./bin/parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.31s user 0.12s system 28% cpu 1.517 total
-./bin/parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.31s user 0.13s system 28% cpu 1.512 total
-./bin/parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.31s user 0.11s system 28% cpu 1.505 total
-./bin/parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.32s user 0.12s system 29% cpu 1.524 total
-./bin/parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.31s user 0.12s system 28% cpu 1.512 total
-./bin/parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.31s user 0.12s system 28% cpu 1.509 total
-./bin/parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.31s user 0.12s system 28% cpu 1.518 total
-./bin/parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.32s user 0.13s system 26% cpu 1.668 total
-./bin/parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.31s user 0.12s system 28% cpu 1.513 total
-./bin/parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.31s user 0.12s system 28% cpu 1.507 total
-./bin/parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.32s user 0.12s system 29% cpu 1.524 total
-./bin/parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.32s user 0.13s system 29% cpu 1.540 total
-./bin/parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.31s user 0.12s system 29% cpu 1.506 total
-./bin/parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.31s user 0.12s system 28% cpu 1.508 total
-./bin/parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.32s user 0.12s system 28% cpu 1.514 total
-./bin/parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.32s user 0.12s system 28% cpu 1.526 total
-./bin/parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.31s user 0.12s system 28% cpu 1.507 total
-./bin/parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.31s user 0.12s system 28% cpu 1.509 total
-./bin/parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.31s user 0.12s system 28% cpu 1.515 total
-./bin/parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.31s user 0.12s system 28% cpu 1.522 total
-./bin/parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.31s user 0.13s system 29% cpu 1.509 total
-./bin/parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.30s user 0.11s system 27% cpu 1.500 total
-./bin/parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.30s user 0.11s system 27% cpu 1.494 total
-./bin/parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.30s user 0.11s system 27% cpu 1.503 total
-./bin/parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.30s user 0.10s system 26% cpu 1.500 total
-./bin/parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.29s user 0.11s system 26% cpu 1.484 total
-./bin/parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.30s user 0.11s system 27% cpu 1.498 total
-./bin/parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.30s user 0.11s system 27% cpu 1.490 total
-./bin/parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.30s user 0.11s system 27% cpu 1.493 total
-./bin/parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.30s user 0.11s system 27% cpu 1.504 total
-./bin/parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.31s user 0.12s system 27% cpu 1.525 total
-./bin/parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.31s user 0.11s system 27% cpu 1.504 total
-./bin/parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.31s user 0.11s system 26% cpu 1.537 total
-./bin/parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.31s user 0.11s system 27% cpu 1.517 total
-./bin/parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.31s user 0.12s system 27% cpu 1.536 total
-./bin/parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.31s user 0.12s system 28% cpu 1.517 total
-./bin/parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.32s user 0.12s system 28% cpu 1.528 total
-./bin/parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.31s user 0.12s system 28% cpu 1.529 total
-./bin/parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.32s user 0.12s system 28% cpu 1.542 total
-./bin/parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.31s user 0.12s system 27% cpu 1.527 total
-./bin/parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.30s user 0.11s system 27% cpu 1.503 total
-./bin/parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.30s user 0.11s system 27% cpu 1.506 total
-./bin/parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.30s user 0.12s system 27% cpu 1.501 total
-./bin/parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.31s user 0.12s system 28% cpu 1.526 total
-./bin/parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.31s user 0.11s system 28% cpu 1.495 total
-./bin/parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.30s user 0.11s system 27% cpu 1.490 total
-./bin/parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.31s user 0.11s system 27% cpu 1.509 total
-./bin/parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.31s user 0.12s system 27% cpu 1.526 total
-./bin/parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.31s user 0.12s system 28% cpu 1.509 total
-./bin/parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.30s user 0.11s system 27% cpu 1.494 total
-./bin/parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.31s user 0.11s system 28% cpu 1.512 total
-./bin/parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.29s user 0.10s system 26% cpu 1.487 total
-./bin/parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.29s user 0.09s system 25% cpu 1.498 total
-./bin/parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.29s user 0.10s system 25% cpu 1.494 total
-./bin/parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.29s user 0.09s system 25% cpu 1.492 total
-./bin/parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.29s user 0.10s system 25% cpu 1.496 total
-./bin/parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.29s user 0.10s system 25% cpu 1.488 total
-./bin/parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.29s user 0.09s system 25% cpu 1.483 total
-./bin/parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.28s user 0.09s system 25% cpu 1.482 total
-./bin/parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.29s user 0.10s system 25% cpu 1.487 total
-./bin/parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.29s user 0.10s system 26% cpu 1.496 total
-./bin/parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.29s user 0.09s system 25% cpu 1.485 total
-./bin/parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.29s user 0.10s system 25% cpu 1.496 total
-./bin/parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.29s user 0.09s system 25% cpu 1.488 total
-./bin/parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.29s user 0.09s system 25% cpu 1.497 total
-./bin/parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.29s user 0.09s system 25% cpu 1.491 total
-./bin/parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.29s user 0.09s system 25% cpu 1.493 total
-./bin/parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.30s user 0.09s system 26% cpu 1.495 total
-./bin/parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.29s user 0.09s system 25% cpu 1.489 total
-./bin/parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.29s user 0.09s system 25% cpu 1.492 total
-./bin/parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.29s user 0.09s system 25% cpu 1.479 total
-./bin/parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.29s user 0.10s system 26% cpu 1.495 total
-./bin/parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.29s user 0.10s system 26% cpu 1.501 total
-./bin/parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.29s user 0.10s system 25% cpu 1.490 total
-./bin/parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.28s user 0.10s system 25% cpu 1.488 total
-./bin/parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.30s user 0.10s system 26% cpu 1.499 total
-./bin/parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.29s user 0.10s system 26% cpu 1.500 total
-./bin/parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.29s user 0.10s system 26% cpu 1.505 total
-./bin/parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.29s user 0.10s system 25% cpu 1.500 total
-./bin/parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.29s user 0.09s system 25% cpu 1.487 total
-./bin/parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.30s user 0.10s system 26% cpu 1.500 total
-./bin/parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.29s user 0.09s system 25% cpu 1.493 total
-./bin/parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.29s user 0.10s system 25% cpu 1.516 total
-./bin/parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.29s user 0.09s system 25% cpu 1.510 total
-./bin/parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.28s user 0.09s system 24% cpu 1.498 total
-./bin/parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.29s user 0.09s system 25% cpu 1.516 total
-./bin/parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.30s user 0.09s system 26% cpu 1.507 total
-./bin/parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.29s user 0.09s system 25% cpu 1.488 total
-./bin/parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.29s user 0.09s system 25% cpu 1.504 total
-./bin/parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.29s user 0.10s system 25% cpu 1.502 total
-./bin/parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.29s user 0.10s system 25% cpu 1.508 total
-./bin/parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.30s user 0.10s system 26% cpu 1.525 total
-./bin/parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.29s user 0.10s system 25% cpu 1.510 total
-./bin/parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.29s user 0.10s system 25% cpu 1.528 total
-./bin/parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.29s user 0.09s system 25% cpu 1.495 total
-./bin/parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.37s user 0.09s system 29% cpu 1.583 total
-./bin/parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.29s user 0.09s system 25% cpu 1.498 total
-./bin/parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.29s user 0.09s system 25% cpu 1.508 total
-./bin/parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.29s user 0.10s system 25% cpu 1.534 total
-./bin/parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.30s user 0.10s system 25% cpu 1.528 total
-./bin/parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.30s user 0.10s system 26% cpu 1.508 total
-./bin/parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.29s user 0.10s system 25% cpu 1.503 total
-./bin/parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.29s user 0.09s system 24% cpu 1.513 total
-./bin/parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.30s user 0.09s system 25% cpu 1.521 total
-./bin/parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.29s user 0.10s system 25% cpu 1.520 total
-./bin/parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.29s user 0.10s system 25% cpu 1.521 total
-./bin/parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.30s user 0.10s system 26% cpu 1.520 total
-./bin/parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.30s user 0.10s system 25% cpu 1.521 total
-./bin/parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.30s user 0.10s system 25% cpu 1.515 total
-./bin/parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.29s user 0.09s system 25% cpu 1.505 total
-./bin/parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.28s user 0.09s system 24% cpu 1.494 total
-./bin/parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.36s user 0.08s system 27% cpu 1.616 total
-./bin/parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.35s user 0.08s system 27% cpu 1.553 total
-./bin/parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.36s user 0.08s system 28% cpu 1.572 total
-./bin/parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.30s user 0.09s system 25% cpu 1.523 total
-./bin/parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.29s user 0.08s system 24% cpu 1.499 total
-./bin/parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.36s user 0.08s system 28% cpu 1.568 total
-./bin/parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.36s user 0.08s system 27% cpu 1.569 total
-./bin/parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.30s user 0.09s system 25% cpu 1.526 total
-./bin/parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.34s user 0.08s system 27% cpu 1.558 total
-./bin/parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.35s user 0.08s system 27% cpu 1.553 total
-./bin/parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.35s user 0.09s system 27% cpu 1.621 total
-./bin/parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.34s user 0.08s system 26% cpu 1.549 total
-./bin/parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.36s user 0.08s system 27% cpu 1.560 total
-./bin/parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.33s user 0.08s system 26% cpu 1.542 total
-./bin/parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.34s user 0.08s system 26% cpu 1.549 total
-./bin/parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.34s user 0.08s system 26% cpu 1.547 total
-./bin/parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.33s user 0.07s system 26% cpu 1.545 total
-./bin/parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.35s user 0.08s system 26% cpu 1.560 total
-./bin/parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.33s user 0.08s system 26% cpu 1.537 total
-./bin/parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.34s user 0.07s system 26% cpu 1.544 total
-./bin/parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.33s user 0.08s system 26% cpu 1.540 total
-./bin/parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.34s user 0.08s system 26% cpu 1.556 total
-./bin/parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.34s user 0.08s system 26% cpu 1.545 total
-./bin/parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.34s user 0.08s system 26% cpu 1.546 total
-./bin/parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.35s user 0.08s system 27% cpu 1.551 total
-./bin/parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.34s user 0.07s system 26% cpu 1.544 total
-./bin/parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.28s user 0.08s system 24% cpu 1.492 total
-./bin/parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.34s user 0.08s system 26% cpu 1.546 total
-./bin/parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.33s user 0.08s system 26% cpu 1.544 total
-./bin/parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.35s user 0.08s system 27% cpu 1.556 total
-./bin/parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.29s user 0.07s system 23% cpu 1.497 total
-./bin/parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.32s user 0.07s system 25% cpu 1.530 total
-./bin/parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.33s user 0.07s system 25% cpu 1.546 total
-./bin/parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.28s user 0.07s system 23% cpu 1.500 total
-./bin/parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.32s user 0.07s system 25% cpu 1.535 total
-./bin/parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.32s user 0.07s system 25% cpu 1.536 total
-./bin/parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.32s user 0.07s system 25% cpu 1.535 total
-./bin/parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.32s user 0.07s system 25% cpu 1.537 total
-./bin/parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.29s user 0.07s system 24% cpu 1.499 total
-./bin/parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.33s user 0.08s system 26% cpu 1.543 total
-./bin/parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.33s user 0.07s system 25% cpu 1.547 total
-./bin/parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.30s user 0.08s system 24% cpu 1.514 total
-./bin/parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.33s user 0.07s system 26% cpu 1.551 total
-./bin/parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.32s user 0.07s system 25% cpu 1.535 total
-./bin/parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.29s user 0.07s system 23% cpu 1.499 total
-./bin/parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.32s user 0.07s system 25% cpu 1.540 total
-./bin/parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.33s user 0.07s system 25% cpu 1.544 total
-./bin/parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.28s user 0.07s system 23% cpu 1.497 total
-./bin/parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.33s user 0.07s system 26% cpu 1.545 total
-./bin/parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.34s user 0.07s system 26% cpu 1.556 total
-./bin/parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.32s user 0.07s system 25% cpu 1.535 total
-./bin/parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.32s user 0.07s system 25% cpu 1.541 total
-./bin/parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.33s user 0.07s system 25% cpu 1.538 total
-./bin/parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.32s user 0.07s system 25% cpu 1.532 total
-./bin/parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.32s user 0.07s system 25% cpu 1.533 total
-./bin/parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.32s user 0.07s system 25% cpu 1.530 total
-./bin/parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.28s user 0.07s system 23% cpu 1.497 total
-./bin/parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.32s user 0.07s system 25% cpu 1.540 total
-./bin/parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.33s user 0.08s system 26% cpu 1.546 total
-./bin/parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.29s user 0.07s system 24% cpu 1.504 total
-./bin/parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.27s user 0.06s system 22% cpu 1.488 total
-./bin/parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.27s user 0.06s system 22% cpu 1.492 total
-./bin/parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.32s user 0.06s system 24% cpu 1.546 total
-./bin/parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.27s user 0.06s system 22% cpu 1.491 total
-./bin/parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.28s user 0.07s system 23% cpu 1.502 total
-./bin/parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.29s user 0.07s system 23% cpu 1.509 total
-./bin/parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.29s user 0.07s system 23% cpu 1.509 total
-./bin/parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.28s user 0.06s system 22% cpu 1.490 total
-./bin/parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.27s user 0.06s system 22% cpu 1.485 total
-./bin/parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.34s user 0.07s system 26% cpu 1.563 total
-./bin/parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.28s user 0.07s system 23% cpu 1.503 total
-./bin/parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.34s user 0.07s system 26% cpu 1.561 total
-./bin/parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.28s user 0.07s system 23% cpu 1.503 total
-./bin/parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.28s user 0.06s system 23% cpu 1.489 total
-./bin/parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.28s user 0.06s system 23% cpu 1.500 total
-./bin/parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.28s user 0.07s system 23% cpu 1.485 total
-./bin/parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.29s user 0.07s system 23% cpu 1.523 total
-./bin/parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.28s user 0.06s system 23% cpu 1.487 total
-./bin/parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.28s user 0.07s system 23% cpu 1.492 total
-./bin/parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.28s user 0.07s system 23% cpu 1.495 total
-./bin/parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.28s user 0.06s system 22% cpu 1.503 total
-./bin/parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.28s user 0.06s system 22% cpu 1.501 total
-./bin/parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.27s user 0.06s system 22% cpu 1.496 total
-./bin/parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.28s user 0.06s system 22% cpu 1.488 total
-./bin/parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.27s user 0.06s system 22% cpu 1.496 total
-./bin/parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.32s user 0.06s system 24% cpu 1.536 total
-./bin/parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.27s user 0.06s system 22% cpu 1.488 total
-./bin/parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.28s user 0.06s system 22% cpu 1.497 total
-./bin/parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.27s user 0.06s system 22% cpu 1.491 total
-./bin/parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.28s user 0.06s system 22% cpu 1.494 total
-./bin/parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.23s user 0.07s system 11% cpu 2.568 total
-./bin/parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.23s user 0.07s system 11% cpu 2.570 total
-./bin/parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.23s user 0.07s system 11% cpu 2.554 total
-./bin/parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.23s user 0.07s system 11% cpu 2.570 total
-./bin/parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.23s user 0.06s system 11% cpu 2.561 total
-./bin/parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.23s user 0.07s system 11% cpu 2.569 total
-./bin/parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.23s user 0.07s system 11% cpu 2.579 total
-./bin/parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.23s user 0.07s system 11% cpu 2.570 total
-./bin/parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.23s user 0.07s system 11% cpu 2.569 total
-./bin/parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.23s user 0.07s system 11% cpu 2.577 total
-./bin/parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.23s user 0.07s system 11% cpu 2.592 total
-./bin/parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.27s user 0.07s system 12% cpu 2.696 total
-./bin/parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.23s user 0.07s system 11% cpu 2.585 total
-./bin/parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.23s user 0.08s system 11% cpu 2.632 total
-./bin/parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.24s user 0.09s system 12% cpu 2.646 total
-./bin/parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.27s user 0.10s system 13% cpu 2.671 total
-./bin/parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.23s user 0.08s system 11% cpu 2.605 total
-./bin/parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.23s user 0.07s system 11% cpu 2.602 total
-./bin/parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.23s user 0.08s system 11% cpu 2.595 total
-./bin/parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.23s user 0.07s system 11% cpu 2.589 total
-./bin/parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.24s user 0.09s system 12% cpu 2.649 total
-./bin/parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.27s user 0.09s system 13% cpu 2.657 total
-./bin/parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.23s user 0.07s system 11% cpu 2.584 total
-./bin/parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.23s user 0.07s system 11% cpu 2.570 total
-./bin/parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.23s user 0.08s system 11% cpu 2.586 total
-./bin/parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.23s user 0.07s system 11% cpu 2.578 total
-./bin/parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.23s user 0.07s system 11% cpu 2.567 total
-./bin/parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.23s user 0.07s system 11% cpu 2.593 total
-./bin/parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.23s user 0.08s system 11% cpu 2.599 total
-./bin/parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.23s user 0.07s system 11% cpu 2.593 total
-./bin/sequential.exe stack -file "${PROG}" > timings.txt  1.78s user 0.03s system 98% cpu 1.851 total
-./bin/sequential.exe stack -file "${PROG}" > timings.txt  1.81s user 0.03s system 99% cpu 1.840 total
-./bin/sequential.exe stack -file "${PROG}" > timings.txt  1.78s user 0.01s system 99% cpu 1.793 total
-./bin/sequential.exe stack -file "${PROG}" > timings.txt  1.78s user 0.02s system 99% cpu 1.807 total
-./bin/sequential.exe stack -file "${PROG}" > timings.txt  1.78s user 0.00s system 99% cpu 1.789 total
-./bin/sequential.exe stack -file "${PROG}" > timings.txt  1.78s user 0.01s system 99% cpu 1.791 total
-./bin/sequential.exe stack -file "${PROG}" > timings.txt  1.78s user 0.01s system 99% cpu 1.785 total
-./bin/sequential.exe stack -file "${PROG}" > timings.txt  1.78s user 0.00s system 99% cpu 1.785 total
-./bin/sequential.exe stack -file "${PROG}" > timings.txt  1.78s user 0.01s system 99% cpu 1.790 total
-./bin/sequential.exe stack -file "${PROG}" > timings.txt  1.78s user 0.01s system 99% cpu 1.794 total
-./bin/sequential.exe stack -file "${PROG}" > timings.txt  1.78s user 0.01s system 99% cpu 1.787 total
-./bin/sequential.exe stack -file "${PROG}" > timings.txt  1.78s user 0.01s system 99% cpu 1.791 total
-./bin/sequential.exe stack -file "${PROG}" > timings.txt  1.78s user 0.01s system 99% cpu 1.787 total
-./bin/sequential.exe stack -file "${PROG}" > timings.txt  1.78s user 0.00s system 99% cpu 1.786 total
-./bin/sequential.exe stack -file "${PROG}" > timings.txt  1.78s user 0.01s system 99% cpu 1.787 total
-./bin/sequential.exe stack -file "${PROG}" > timings.txt  1.78s user 0.01s system 99% cpu 1.784 total
-./bin/sequential.exe stack -file "${PROG}" > timings.txt  1.78s user 0.01s system 99% cpu 1.789 total
-./bin/sequential.exe stack -file "${PROG}" > timings.txt  1.78s user 0.00s system 99% cpu 1.785 total
-./bin/sequential.exe stack -file "${PROG}" > timings.txt  1.78s user 0.00s system 99% cpu 1.785 total
-./bin/sequential.exe stack -file "${PROG}" > timings.txt  1.78s user 0.01s system 99% cpu 1.792 total
-./bin/sequential.exe stack -file "${PROG}" > timings.txt  1.78s user 0.01s system 99% cpu 1.791 total
-./bin/sequential.exe stack -file "${PROG}" > timings.txt  1.78s user 0.01s system 99% cpu 1.790 total
-./bin/sequential.exe stack -file "${PROG}" > timings.txt  1.78s user 0.01s system 99% cpu 1.788 total
-./bin/sequential.exe stack -file "${PROG}" > timings.txt  1.78s user 0.00s system 99% cpu 1.788 total
-./bin/sequential.exe stack -file "${PROG}" > timings.txt  1.78s user 0.00s system 99% cpu 1.791 total
-./bin/sequential.exe stack -file "${PROG}" > timings.txt  1.78s user 0.00s system 99% cpu 1.784 total
-./bin/sequential.exe stack -file "${PROG}" > timings.txt  1.78s user 0.02s system 99% cpu 1.800 total
-./bin/sequential.exe stack -file "${PROG}" > timings.txt  1.78s user 0.02s system 99% cpu 1.806 total
-./bin/sequential.exe stack -file "${PROG}" > timings.txt  1.78s user 0.02s system 99% cpu 1.805 total
-./bin/sequential.exe stack -file "${PROG}" > timings.txt  1.78s user 0.01s system 99% cpu 1.792 total
-./bin/sequential.exe sequential -file "${PROG}" > timings.txt  0.25s user 0.01s system 99% cpu 0.260 total
-./bin/sequential.exe sequential -file "${PROG}" > timings.txt  0.25s user 0.01s system 99% cpu 0.261 total
-./bin/sequential.exe sequential -file "${PROG}" > timings.txt  0.25s user 0.01s system 99% cpu 0.257 total
-./bin/sequential.exe sequential -file "${PROG}" > timings.txt  0.26s user 0.01s system 99% cpu 0.263 total
-./bin/sequential.exe sequential -file "${PROG}" > timings.txt  0.25s user 0.01s system 96% cpu 0.267 total
-./bin/sequential.exe sequential -file "${PROG}" > timings.txt  0.25s user 0.01s system 99% cpu 0.256 total
-./bin/sequential.exe sequential -file "${PROG}" > timings.txt  0.25s user 0.01s system 99% cpu 0.256 total
-./bin/sequential.exe sequential -file "${PROG}" > timings.txt  0.25s user 0.01s system 99% cpu 0.255 total
-./bin/sequential.exe sequential -file "${PROG}" > timings.txt  0.25s user 0.01s system 99% cpu 0.256 total
-./bin/sequential.exe sequential -file "${PROG}" > timings.txt  0.25s user 0.01s system 99% cpu 0.254 total
-./bin/sequential.exe sequential -file "${PROG}" > timings.txt  0.25s user 0.01s system 99% cpu 0.255 total
-./bin/sequential.exe sequential -file "${PROG}" > timings.txt  0.25s user 0.01s system 99% cpu 0.254 total
-./bin/sequential.exe sequential -file "${PROG}" > timings.txt  0.25s user 0.01s system 99% cpu 0.254 total
-./bin/sequential.exe sequential -file "${PROG}" > timings.txt  0.25s user 0.01s system 99% cpu 0.261 total
-./bin/sequential.exe sequential -file "${PROG}" > timings.txt  0.25s user 0.01s system 99% cpu 0.255 total
-./bin/sequential.exe sequential -file "${PROG}" > timings.txt  0.25s user 0.01s system 99% cpu 0.261 total
-./bin/sequential.exe sequential -file "${PROG}" > timings.txt  0.25s user 0.01s system 99% cpu 0.259 total
-./bin/sequential.exe sequential -file "${PROG}" > timings.txt  0.25s user 0.01s system 99% cpu 0.256 total
-./bin/sequential.exe sequential -file "${PROG}" > timings.txt  0.25s user 0.01s system 99% cpu 0.261 total
-./bin/sequential.exe sequential -file "${PROG}" > timings.txt  0.25s user 0.01s system 99% cpu 0.256 total
-./bin/sequential.exe sequential -file "${PROG}" > timings.txt  0.26s user 0.01s system 99% cpu 0.262 total
-./bin/sequential.exe sequential -file "${PROG}" > timings.txt  0.25s user 0.01s system 99% cpu 0.261 total
-./bin/sequential.exe sequential -file "${PROG}" > timings.txt  0.25s user 0.01s system 99% cpu 0.257 total
-./bin/sequential.exe sequential -file "${PROG}" > timings.txt  0.25s user 0.01s system 99% cpu 0.257 total
-./bin/sequential.exe sequential -file "${PROG}" > timings.txt  0.25s user 0.01s system 99% cpu 0.256 total
-./bin/sequential.exe sequential -file "${PROG}" > timings.txt  0.25s user 0.01s system 99% cpu 0.262 total
-./bin/sequential.exe sequential -file "${PROG}" > timings.txt  0.25s user 0.01s system 99% cpu 0.257 total
-./bin/sequential.exe sequential -file "${PROG}" > timings.txt  0.25s user 0.01s system 99% cpu 0.257 total
-./bin/sequential.exe sequential -file "${PROG}" > timings.txt  0.25s user 0.01s system 99% cpu 0.258 total
-./bin/sequential.exe sequential -file "${PROG}" > timings.txt  0.25s user 0.01s system 99% cpu 0.256 total
-"""
+in_string = """./bin/parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.06s user 0.07s system 41% cpu 0.321 total
+./bin/parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.06s user 0.08s system 42% cpu 0.315 total
+./bin/parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.06s user 0.08s system 42% cpu 0.313 total
+./bin/parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.06s user 0.07s system 41% cpu 0.316 total
+./bin/parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.06s user 0.07s system 42% cpu 0.315 total
+./bin/parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.06s user 0.07s system 40% cpu 0.316 total
+./bin/parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.06s user 0.07s system 40% cpu 0.319 total
+./bin/parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.06s user 0.07s system 42% cpu 0.319 total
+./bin/parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.06s user 0.07s system 42% cpu 0.320 total
+./bin/parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.06s user 0.07s system 42% cpu 0.317 total
+./bin/parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.06s user 0.08s system 42% cpu 0.317 total
+./bin/parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.06s user 0.08s system 42% cpu 0.320 total
+./bin/parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.06s user 0.08s system 42% cpu 0.317 total
+./bin/parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.06s user 0.07s system 41% cpu 0.325 total
+./bin/parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.06s user 0.08s system 43% cpu 0.316 total
+./bin/parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.06s user 0.08s system 42% cpu 0.318 total
+./bin/parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.06s user 0.08s system 42% cpu 0.320 total
+./bin/parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.06s user 0.07s system 41% cpu 0.319 total
+./bin/parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.06s user 0.07s system 41% cpu 0.319 total
+./bin/parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.06s user 0.07s system 41% cpu 0.323 total
+./bin/parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.06s user 0.08s system 41% cpu 0.331 total
+./bin/parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.06s user 0.08s system 42% cpu 0.325 total
+./bin/parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.06s user 0.07s system 40% cpu 0.324 total
+./bin/parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.06s user 0.07s system 40% cpu 0.319 total
+./bin/parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.06s user 0.07s system 39% cpu 0.321 total
+./bin/parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.06s user 0.07s system 41% cpu 0.320 total
+./bin/parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.06s user 0.08s system 43% cpu 0.313 total
+./bin/parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.06s user 0.07s system 42% cpu 0.316 total
+./bin/parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.06s user 0.07s system 40% cpu 0.317 total
+./bin/parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.06s user 0.08s system 41% cpu 0.321 total
+./bin/parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.05s user 0.06s system 37% cpu 0.310 total
+./bin/parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.05s user 0.06s system 36% cpu 0.315 total
+./bin/parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.05s user 0.06s system 35% cpu 0.321 total
+./bin/parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.05s user 0.06s system 37% cpu 0.314 total
+./bin/parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.05s user 0.07s system 37% cpu 0.317 total
+./bin/parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.05s user 0.07s system 38% cpu 0.320 total
+./bin/parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.05s user 0.06s system 37% cpu 0.314 total
+./bin/parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.05s user 0.07s system 37% cpu 0.315 total
+./bin/parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.05s user 0.07s system 37% cpu 0.310 total
+./bin/parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.05s user 0.07s system 38% cpu 0.312 total
+./bin/parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.05s user 0.06s system 36% cpu 0.315 total
+./bin/parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.05s user 0.06s system 35% cpu 0.330 total
+./bin/parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.05s user 0.07s system 36% cpu 0.330 total
+./bin/parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.05s user 0.07s system 39% cpu 0.316 total
+./bin/parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.05s user 0.07s system 37% cpu 0.314 total
+./bin/parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.05s user 0.07s system 37% cpu 0.317 total
+./bin/parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.05s user 0.07s system 37% cpu 0.317 total
+./bin/parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.05s user 0.06s system 37% cpu 0.311 total
+./bin/parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.05s user 0.06s system 36% cpu 0.318 total
+./bin/parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.05s user 0.06s system 37% cpu 0.320 total
+./bin/parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.05s user 0.07s system 37% cpu 0.314 total
+./bin/parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.05s user 0.06s system 37% cpu 0.315 total
+./bin/parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.05s user 0.06s system 37% cpu 0.314 total
+./bin/parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.05s user 0.07s system 38% cpu 0.316 total
+./bin/parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.05s user 0.06s system 37% cpu 0.316 total
+./bin/parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.05s user 0.07s system 38% cpu 0.316 total
+./bin/parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.05s user 0.07s system 38% cpu 0.313 total
+./bin/parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.05s user 0.07s system 38% cpu 0.310 total
+./bin/parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.05s user 0.06s system 37% cpu 0.311 total
+./bin/parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.05s user 0.07s system 36% cpu 0.318 total
+./bin/parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.04s user 0.05s system 31% cpu 0.315 total
+./bin/parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.04s user 0.05s system 31% cpu 0.311 total
+./bin/parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.05s user 0.06s system 32% cpu 0.316 total
+./bin/parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.04s user 0.06s system 33% cpu 0.310 total
+./bin/parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.04s user 0.06s system 32% cpu 0.309 total
+./bin/parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.04s user 0.06s system 32% cpu 0.310 total
+./bin/parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.04s user 0.05s system 31% cpu 0.310 total
+./bin/parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.04s user 0.05s system 32% cpu 0.306 total
+./bin/parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.04s user 0.06s system 31% cpu 0.310 total
+./bin/parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.04s user 0.05s system 31% cpu 0.304 total
+./bin/parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.04s user 0.06s system 32% cpu 0.310 total
+./bin/parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.04s user 0.05s system 31% cpu 0.308 total
+./bin/parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.04s user 0.06s system 32% cpu 0.309 total
+./bin/parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.04s user 0.05s system 28% cpu 0.321 total
+./bin/parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.04s user 0.05s system 32% cpu 0.306 total
+./bin/parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.04s user 0.05s system 31% cpu 0.311 total
+./bin/parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.05s user 0.06s system 33% cpu 0.310 total
+./bin/parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.04s user 0.06s system 32% cpu 0.309 total
+./bin/parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.04s user 0.05s system 31% cpu 0.306 total
+./bin/parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.04s user 0.06s system 32% cpu 0.307 total
+./bin/parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.04s user 0.05s system 31% cpu 0.309 total
+./bin/parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.04s user 0.05s system 31% cpu 0.307 total
+./bin/parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.04s user 0.06s system 32% cpu 0.307 total
+./bin/parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.04s user 0.05s system 31% cpu 0.308 total
+./bin/parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.04s user 0.06s system 30% cpu 0.327 total
+./bin/parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.04s user 0.05s system 32% cpu 0.308 total
+./bin/parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.04s user 0.05s system 31% cpu 0.311 total
+./bin/parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.04s user 0.05s system 31% cpu 0.308 total
+./bin/parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.04s user 0.06s system 32% cpu 0.309 total
+./bin/parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.04s user 0.05s system 31% cpu 0.309 total
+./bin/parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.04s user 0.05s system 26% cpu 0.308 total
+./bin/parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.04s user 0.05s system 27% cpu 0.302 total
+./bin/parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.04s user 0.05s system 27% cpu 0.305 total
+./bin/parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.04s user 0.04s system 26% cpu 0.307 total
+./bin/parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.04s user 0.05s system 26% cpu 0.308 total
+./bin/parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.04s user 0.04s system 26% cpu 0.305 total
+./bin/parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.04s user 0.05s system 27% cpu 0.307 total
+./bin/parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.04s user 0.05s system 26% cpu 0.315 total
+./bin/parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.04s user 0.04s system 26% cpu 0.307 total
+./bin/parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.04s user 0.05s system 27% cpu 0.305 total
+./bin/parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.04s user 0.05s system 27% cpu 0.304 total
+./bin/parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.04s user 0.05s system 27% cpu 0.303 total
+./bin/parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.04s user 0.05s system 26% cpu 0.302 total
+./bin/parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.04s user 0.05s system 27% cpu 0.306 total
+./bin/parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.04s user 0.05s system 27% cpu 0.306 total
+./bin/parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.04s user 0.05s system 26% cpu 0.305 total
+./bin/parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.04s user 0.05s system 27% cpu 0.305 total
+./bin/parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.04s user 0.05s system 27% cpu 0.307 total
+./bin/parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.04s user 0.05s system 27% cpu 0.309 total
+./bin/parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.04s user 0.05s system 26% cpu 0.304 total
+./bin/parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.04s user 0.05s system 26% cpu 0.308 total
+./bin/parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.04s user 0.05s system 27% cpu 0.306 total
+./bin/parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.04s user 0.04s system 25% cpu 0.309 total
+./bin/parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.04s user 0.04s system 26% cpu 0.305 total
+./bin/parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.04s user 0.05s system 27% cpu 0.311 total
+./bin/parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.04s user 0.05s system 26% cpu 0.313 total
+./bin/parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.04s user 0.04s system 26% cpu 0.305 total
+./bin/parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.04s user 0.04s system 27% cpu 0.302 total
+./bin/parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.04s user 0.04s system 26% cpu 0.304 total
+./bin/parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.04s user 0.05s system 28% cpu 0.305 total
+./bin/parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.03s user 0.04s system 22% cpu 0.303 total
+./bin/parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.03s user 0.04s system 23% cpu 0.304 total
+./bin/parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.03s user 0.04s system 22% cpu 0.302 total
+./bin/parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.03s user 0.04s system 22% cpu 0.301 total
+./bin/parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.03s user 0.04s system 22% cpu 0.310 total
+./bin/parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.03s user 0.04s system 23% cpu 0.307 total
+./bin/parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.03s user 0.04s system 23% cpu 0.303 total
+./bin/parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.03s user 0.04s system 22% cpu 0.305 total
+./bin/parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.03s user 0.04s system 22% cpu 0.303 total
+./bin/parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.03s user 0.04s system 22% cpu 0.304 total
+./bin/parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.03s user 0.04s system 22% cpu 0.313 total
+./bin/parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.03s user 0.04s system 22% cpu 0.303 total
+./bin/parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.03s user 0.04s system 23% cpu 0.305 total
+./bin/parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.03s user 0.04s system 22% cpu 0.302 total
+./bin/parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.03s user 0.04s system 23% cpu 0.303 total
+./bin/parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.03s user 0.04s system 23% cpu 0.304 total
+./bin/parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.03s user 0.04s system 22% cpu 0.306 total
+./bin/parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.03s user 0.04s system 23% cpu 0.306 total
+./bin/parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.03s user 0.04s system 23% cpu 0.304 total
+./bin/parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.03s user 0.04s system 23% cpu 0.303 total
+./bin/parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.03s user 0.04s system 22% cpu 0.312 total
+./bin/parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.03s user 0.04s system 23% cpu 0.301 total
+./bin/parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.03s user 0.04s system 22% cpu 0.304 total
+./bin/parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.03s user 0.04s system 22% cpu 0.302 total
+./bin/parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.03s user 0.04s system 21% cpu 0.312 total
+./bin/parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.03s user 0.04s system 21% cpu 0.304 total
+./bin/parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.03s user 0.04s system 22% cpu 0.301 total
+./bin/parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.03s user 0.04s system 22% cpu 0.302 total
+./bin/parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.03s user 0.04s system 23% cpu 0.305 total
+./bin/parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.03s user 0.04s system 22% cpu 0.302 total
+./bin/parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.03s user 0.03s system 18% cpu 0.309 total
+./bin/parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.03s user 0.03s system 18% cpu 0.304 total
+./bin/parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.03s user 0.03s system 18% cpu 0.306 total
+./bin/parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.03s user 0.03s system 18% cpu 0.302 total
+./bin/parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.03s user 0.03s system 18% cpu 0.301 total
+./bin/parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.03s user 0.03s system 18% cpu 0.307 total
+./bin/parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.03s user 0.03s system 18% cpu 0.302 total
+./bin/parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.03s user 0.03s system 18% cpu 0.305 total
+./bin/parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.03s user 0.03s system 18% cpu 0.304 total
+./bin/parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.03s user 0.03s system 18% cpu 0.301 total
+./bin/parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.03s user 0.03s system 18% cpu 0.307 total
+./bin/parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.03s user 0.03s system 18% cpu 0.306 total
+./bin/parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.03s user 0.03s system 18% cpu 0.302 total
+./bin/parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.03s user 0.03s system 18% cpu 0.303 total
+./bin/parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.03s user 0.03s system 18% cpu 0.303 total
+./bin/parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.03s user 0.03s system 18% cpu 0.304 total
+./bin/parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.03s user 0.03s system 18% cpu 0.304 total
+./bin/parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.03s user 0.03s system 18% cpu 0.301 total
+./bin/parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.03s user 0.03s system 18% cpu 0.304 total
+./bin/parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.03s user 0.03s system 18% cpu 0.306 total
+./bin/parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.03s user 0.03s system 18% cpu 0.303 total
+./bin/parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.03s user 0.03s system 18% cpu 0.312 total
+./bin/parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.03s user 0.03s system 18% cpu 0.305 total
+./bin/parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.03s user 0.03s system 18% cpu 0.304 total
+./bin/parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.03s user 0.03s system 19% cpu 0.301 total
+./bin/parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.03s user 0.03s system 18% cpu 0.303 total
+./bin/parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.03s user 0.03s system 18% cpu 0.304 total
+./bin/parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.03s user 0.03s system 18% cpu 0.304 total
+./bin/parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.03s user 0.03s system 18% cpu 0.302 total
+./bin/parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.03s user 0.03s system 18% cpu 0.303 total
+./bin/parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.02s user 0.02s system 14% cpu 0.300 total
+./bin/parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.02s user 0.02s system 14% cpu 0.301 total
+./bin/parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.02s user 0.02s system 14% cpu 0.297 total
+./bin/parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.02s user 0.02s system 14% cpu 0.301 total
+./bin/parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.02s user 0.02s system 14% cpu 0.297 total
+./bin/parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.02s user 0.02s system 14% cpu 0.299 total
+./bin/parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.02s user 0.02s system 14% cpu 0.303 total
+./bin/parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.02s user 0.02s system 14% cpu 0.303 total
+./bin/parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.02s user 0.02s system 14% cpu 0.301 total
+./bin/parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.02s user 0.02s system 13% cpu 0.299 total
+./bin/parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.02s user 0.02s system 14% cpu 0.299 total
+./bin/parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.02s user 0.02s system 14% cpu 0.300 total
+./bin/parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.02s user 0.02s system 14% cpu 0.300 total
+./bin/parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.02s user 0.02s system 14% cpu 0.296 total
+./bin/parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.02s user 0.02s system 14% cpu 0.298 total
+./bin/parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.02s user 0.02s system 14% cpu 0.299 total
+./bin/parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.02s user 0.02s system 14% cpu 0.299 total
+./bin/parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.02s user 0.02s system 14% cpu 0.303 total
+./bin/parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.02s user 0.02s system 14% cpu 0.301 total
+./bin/parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.02s user 0.02s system 15% cpu 0.308 total
+./bin/parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.02s user 0.02s system 15% cpu 0.299 total
+./bin/parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.02s user 0.02s system 15% cpu 0.305 total
+./bin/parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.02s user 0.02s system 14% cpu 0.305 total
+./bin/parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.02s user 0.02s system 15% cpu 0.303 total
+./bin/parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.02s user 0.02s system 14% cpu 0.305 total
+./bin/parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.02s user 0.02s system 15% cpu 0.308 total
+./bin/parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.02s user 0.02s system 15% cpu 0.305 total
+./bin/parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.02s user 0.02s system 14% cpu 0.311 total
+./bin/parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.02s user 0.03s system 15% cpu 0.304 total
+./bin/parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.02s user 0.02s system 15% cpu 0.304 total
+./bin/parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.02s user 0.02s system 8% cpu 0.527 total
+./bin/parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.02s user 0.02s system 8% cpu 0.525 total
+./bin/parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.02s user 0.02s system 8% cpu 0.524 total
+./bin/parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.02s user 0.02s system 8% cpu 0.520 total
+./bin/parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.02s user 0.02s system 8% cpu 0.515 total
+./bin/parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.02s user 0.02s system 8% cpu 0.520 total
+./bin/parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.02s user 0.02s system 8% cpu 0.516 total
+./bin/parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.02s user 0.02s system 8% cpu 0.517 total
+./bin/parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.02s user 0.02s system 7% cpu 0.517 total
+./bin/parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.02s user 0.02s system 7% cpu 0.521 total
+./bin/parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.02s user 0.02s system 8% cpu 0.522 total
+./bin/parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.02s user 0.02s system 7% cpu 0.515 total
+./bin/parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.02s user 0.02s system 7% cpu 0.517 total
+./bin/parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.02s user 0.02s system 7% cpu 0.517 total
+./bin/parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.02s user 0.02s system 7% cpu 0.515 total
+./bin/parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.02s user 0.02s system 8% cpu 0.512 total
+./bin/parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.02s user 0.02s system 7% cpu 0.518 total
+./bin/parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.02s user 0.02s system 8% cpu 0.516 total
+./bin/parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.02s user 0.02s system 7% cpu 0.517 total
+./bin/parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.02s user 0.02s system 8% cpu 0.516 total
+./bin/parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.02s user 0.02s system 8% cpu 0.524 total
+./bin/parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.02s user 0.02s system 8% cpu 0.520 total
+./bin/parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.02s user 0.02s system 8% cpu 0.520 total
+./bin/parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.02s user 0.02s system 8% cpu 0.520 total
+./bin/parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.02s user 0.02s system 8% cpu 0.519 total
+./bin/parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.02s user 0.02s system 8% cpu 0.520 total
+./bin/parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.02s user 0.02s system 8% cpu 0.520 total
+./bin/parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.02s user 0.02s system 7% cpu 0.518 total
+./bin/parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.02s user 0.02s system 8% cpu 0.513 total
+./bin/parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.02s user 0.02s system 8% cpu 0.515 total
+./bin/sequential.exe stack -file "${PROG}" > timings.txt  0.45s user 0.01s system 92% cpu 0.491 total
+./bin/sequential.exe stack -file "${PROG}" > timings.txt  0.44s user 0.00s system 99% cpu 0.450 total
+./bin/sequential.exe stack -file "${PROG}" > timings.txt  0.44s user 0.00s system 99% cpu 0.449 total
+./bin/sequential.exe stack -file "${PROG}" > timings.txt  0.44s user 0.00s system 99% cpu 0.449 total
+./bin/sequential.exe stack -file "${PROG}" > timings.txt  0.44s user 0.00s system 99% cpu 0.449 total
+./bin/sequential.exe stack -file "${PROG}" > timings.txt  0.44s user 0.00s system 99% cpu 0.447 total
+./bin/sequential.exe stack -file "${PROG}" > timings.txt  0.45s user 0.00s system 99% cpu 0.453 total
+./bin/sequential.exe stack -file "${PROG}" > timings.txt  0.44s user 0.00s system 99% cpu 0.448 total
+./bin/sequential.exe stack -file "${PROG}" > timings.txt  0.44s user 0.00s system 99% cpu 0.447 total
+./bin/sequential.exe stack -file "${PROG}" > timings.txt  0.44s user 0.00s system 99% cpu 0.447 total
+./bin/sequential.exe stack -file "${PROG}" > timings.txt  0.44s user 0.00s system 99% cpu 0.448 total
+./bin/sequential.exe stack -file "${PROG}" > timings.txt  0.45s user 0.00s system 99% cpu 0.457 total
+./bin/sequential.exe stack -file "${PROG}" > timings.txt  0.45s user 0.00s system 99% cpu 0.451 total
+./bin/sequential.exe stack -file "${PROG}" > timings.txt  0.44s user 0.00s system 99% cpu 0.448 total
+./bin/sequential.exe stack -file "${PROG}" > timings.txt  0.44s user 0.00s system 99% cpu 0.448 total
+./bin/sequential.exe stack -file "${PROG}" > timings.txt  0.44s user 0.00s system 99% cpu 0.449 total
+./bin/sequential.exe stack -file "${PROG}" > timings.txt  0.44s user 0.00s system 99% cpu 0.447 total
+./bin/sequential.exe stack -file "${PROG}" > timings.txt  0.44s user 0.00s system 99% cpu 0.448 total
+./bin/sequential.exe stack -file "${PROG}" > timings.txt  0.44s user 0.00s system 99% cpu 0.449 total
+./bin/sequential.exe stack -file "${PROG}" > timings.txt  0.44s user 0.00s system 99% cpu 0.448 total
+./bin/sequential.exe stack -file "${PROG}" > timings.txt  0.44s user 0.01s system 99% cpu 0.451 total
+./bin/sequential.exe stack -file "${PROG}" > timings.txt  0.44s user 0.01s system 99% cpu 0.450 total
+./bin/sequential.exe stack -file "${PROG}" > timings.txt  0.45s user 0.00s system 99% cpu 0.455 total
+./bin/sequential.exe stack -file "${PROG}" > timings.txt  0.44s user 0.01s system 99% cpu 0.450 total
+./bin/sequential.exe stack -file "${PROG}" > timings.txt  0.45s user 0.01s system 99% cpu 0.452 total
+./bin/sequential.exe stack -file "${PROG}" > timings.txt  0.45s user 0.01s system 99% cpu 0.452 total
+./bin/sequential.exe stack -file "${PROG}" > timings.txt  0.44s user 0.01s system 99% cpu 0.451 total
+./bin/sequential.exe stack -file "${PROG}" > timings.txt  0.44s user 0.01s system 99% cpu 0.452 total
+./bin/sequential.exe stack -file "${PROG}" > timings.txt  0.44s user 0.01s system 99% cpu 0.453 total
+./bin/sequential.exe stack -file "${PROG}" > timings.txt  0.44s user 0.00s system 99% cpu 0.449 total
+./bin/sequential.exe sequential -file "${PROG}" > timings.txt  0.36s user 0.01s system 99% cpu 0.363 total
+./bin/sequential.exe sequential -file "${PROG}" > timings.txt  0.36s user 0.01s system 99% cpu 0.370 total
+./bin/sequential.exe sequential -file "${PROG}" > timings.txt  0.36s user 0.01s system 99% cpu 0.370 total
+./bin/sequential.exe sequential -file "${PROG}" > timings.txt  0.36s user 0.01s system 99% cpu 0.375 total
+./bin/sequential.exe sequential -file "${PROG}" > timings.txt  0.38s user 0.01s system 99% cpu 0.383 total
+./bin/sequential.exe sequential -file "${PROG}" > timings.txt  0.36s user 0.01s system 99% cpu 0.365 total
+./bin/sequential.exe sequential -file "${PROG}" > timings.txt  0.36s user 0.01s system 99% cpu 0.372 total
+./bin/sequential.exe sequential -file "${PROG}" > timings.txt  0.36s user 0.01s system 99% cpu 0.368 total
+./bin/sequential.exe sequential -file "${PROG}" > timings.txt  0.36s user 0.01s system 99% cpu 0.370 total
+./bin/sequential.exe sequential -file "${PROG}" > timings.txt  0.36s user 0.01s system 99% cpu 0.365 total
+./bin/sequential.exe sequential -file "${PROG}" > timings.txt  0.35s user 0.01s system 99% cpu 0.362 total
+./bin/sequential.exe sequential -file "${PROG}" > timings.txt  0.36s user 0.01s system 99% cpu 0.363 total
+./bin/sequential.exe sequential -file "${PROG}" > timings.txt  0.36s user 0.01s system 99% cpu 0.371 total
+./bin/sequential.exe sequential -file "${PROG}" > timings.txt  0.36s user 0.01s system 99% cpu 0.364 total
+./bin/sequential.exe sequential -file "${PROG}" > timings.txt  0.36s user 0.01s system 99% cpu 0.363 total
+./bin/sequential.exe sequential -file "${PROG}" > timings.txt  0.36s user 0.01s system 99% cpu 0.366 total
+./bin/sequential.exe sequential -file "${PROG}" > timings.txt  0.38s user 0.01s system 99% cpu 0.384 total
+./bin/sequential.exe sequential -file "${PROG}" > timings.txt  0.36s user 0.01s system 99% cpu 0.367 total
+./bin/sequential.exe sequential -file "${PROG}" > timings.txt  0.36s user 0.01s system 99% cpu 0.368 total
+./bin/sequential.exe sequential -file "${PROG}" > timings.txt  0.36s user 0.01s system 99% cpu 0.368 total
+./bin/sequential.exe sequential -file "${PROG}" > timings.txt  0.36s user 0.01s system 99% cpu 0.366 total
+./bin/sequential.exe sequential -file "${PROG}" > timings.txt  0.38s user 0.01s system 99% cpu 0.386 total
+./bin/sequential.exe sequential -file "${PROG}" > timings.txt  0.35s user 0.01s system 99% cpu 0.364 total
+./bin/sequential.exe sequential -file "${PROG}" > timings.txt  0.36s user 0.01s system 99% cpu 0.367 total
+./bin/sequential.exe sequential -file "${PROG}" > timings.txt  0.36s user 0.01s system 99% cpu 0.366 total
+./bin/sequential.exe sequential -file "${PROG}" > timings.txt  0.36s user 0.01s system 99% cpu 0.367 total
+./bin/sequential.exe sequential -file "${PROG}" > timings.txt  0.36s user 0.01s system 99% cpu 0.367 total
+./bin/sequential.exe sequential -file "${PROG}" > timings.txt  0.36s user 0.01s system 99% cpu 0.367 total
+./bin/sequential.exe sequential -file "${PROG}" > timings.txt  0.38s user 0.01s system 99% cpu 0.390 total
+./bin/sequential.exe sequential -file "${PROG}" > timings.txt  0.36s user 0.01s system 99% cpu 0.364 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.05s user 0.08s system 61% cpu 0.218 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.06s user 0.07s system 73% cpu 0.172 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.05s user 0.07s system 70% cpu 0.170 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.05s user 0.07s system 71% cpu 0.173 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.06s user 0.07s system 70% cpu 0.175 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.05s user 0.07s system 69% cpu 0.173 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.05s user 0.07s system 71% cpu 0.170 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.05s user 0.06s system 68% cpu 0.172 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.05s user 0.07s system 69% cpu 0.171 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.05s user 0.07s system 70% cpu 0.172 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.05s user 0.07s system 69% cpu 0.171 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.05s user 0.07s system 73% cpu 0.169 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.06s user 0.07s system 70% cpu 0.178 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.05s user 0.07s system 68% cpu 0.172 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.05s user 0.07s system 70% cpu 0.173 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.05s user 0.06s system 61% cpu 0.181 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.05s user 0.07s system 70% cpu 0.172 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.06s user 0.07s system 73% cpu 0.172 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.05s user 0.06s system 67% cpu 0.174 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.06s user 0.07s system 70% cpu 0.179 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.06s user 0.07s system 71% cpu 0.172 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.05s user 0.07s system 68% cpu 0.175 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.06s user 0.07s system 70% cpu 0.174 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.05s user 0.07s system 71% cpu 0.172 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.06s user 0.07s system 73% cpu 0.173 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.06s user 0.07s system 72% cpu 0.171 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.05s user 0.07s system 71% cpu 0.173 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.05s user 0.07s system 70% cpu 0.171 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.06s user 0.07s system 69% cpu 0.176 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 8 > timings.txt  0.06s user 0.07s system 71% cpu 0.174 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.05s user 0.06s system 63% cpu 0.168 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.05s user 0.06s system 64% cpu 0.169 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.05s user 0.06s system 61% cpu 0.169 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.05s user 0.06s system 63% cpu 0.167 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.05s user 0.06s system 63% cpu 0.169 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.05s user 0.06s system 66% cpu 0.168 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.05s user 0.06s system 64% cpu 0.167 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.05s user 0.06s system 63% cpu 0.169 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.05s user 0.06s system 61% cpu 0.169 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.05s user 0.06s system 62% cpu 0.170 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.05s user 0.06s system 63% cpu 0.165 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.05s user 0.06s system 59% cpu 0.169 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.05s user 0.06s system 63% cpu 0.170 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.05s user 0.06s system 62% cpu 0.169 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.05s user 0.06s system 64% cpu 0.168 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.05s user 0.06s system 62% cpu 0.167 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.05s user 0.06s system 63% cpu 0.170 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.05s user 0.06s system 58% cpu 0.182 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.05s user 0.06s system 61% cpu 0.169 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.05s user 0.06s system 61% cpu 0.171 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.05s user 0.06s system 61% cpu 0.169 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.05s user 0.06s system 62% cpu 0.173 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.05s user 0.06s system 61% cpu 0.170 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.05s user 0.05s system 59% cpu 0.167 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.05s user 0.06s system 61% cpu 0.172 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.05s user 0.06s system 61% cpu 0.169 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.05s user 0.06s system 60% cpu 0.175 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.05s user 0.06s system 65% cpu 0.167 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.05s user 0.06s system 63% cpu 0.173 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 7 > timings.txt  0.05s user 0.06s system 61% cpu 0.167 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.04s user 0.05s system 56% cpu 0.165 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.04s user 0.05s system 55% cpu 0.164 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.04s user 0.05s system 53% cpu 0.168 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.04s user 0.05s system 53% cpu 0.169 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.04s user 0.05s system 56% cpu 0.163 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.04s user 0.05s system 50% cpu 0.173 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.04s user 0.05s system 55% cpu 0.164 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.04s user 0.05s system 54% cpu 0.169 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.04s user 0.05s system 54% cpu 0.167 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.04s user 0.05s system 56% cpu 0.166 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.04s user 0.05s system 53% cpu 0.172 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.04s user 0.05s system 49% cpu 0.179 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.04s user 0.05s system 55% cpu 0.165 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.04s user 0.05s system 53% cpu 0.172 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.04s user 0.05s system 53% cpu 0.166 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.04s user 0.05s system 53% cpu 0.170 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.04s user 0.05s system 53% cpu 0.168 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.04s user 0.05s system 55% cpu 0.165 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.04s user 0.05s system 53% cpu 0.164 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.04s user 0.05s system 51% cpu 0.172 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.04s user 0.05s system 54% cpu 0.165 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.04s user 0.05s system 55% cpu 0.166 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.04s user 0.05s system 56% cpu 0.165 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.04s user 0.05s system 53% cpu 0.166 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.04s user 0.05s system 57% cpu 0.167 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.04s user 0.05s system 55% cpu 0.167 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.04s user 0.05s system 52% cpu 0.167 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.04s user 0.05s system 54% cpu 0.168 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.04s user 0.05s system 55% cpu 0.165 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 6 > timings.txt  0.04s user 0.05s system 54% cpu 0.165 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.04s user 0.04s system 47% cpu 0.161 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.03s user 0.04s system 46% cpu 0.165 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.03s user 0.04s system 44% cpu 0.166 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.03s user 0.04s system 48% cpu 0.159 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.03s user 0.04s system 46% cpu 0.167 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.03s user 0.04s system 47% cpu 0.164 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.03s user 0.04s system 44% cpu 0.168 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.03s user 0.04s system 46% cpu 0.162 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.03s user 0.04s system 46% cpu 0.162 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.03s user 0.04s system 47% cpu 0.162 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.04s user 0.04s system 48% cpu 0.160 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.03s user 0.04s system 45% cpu 0.164 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.03s user 0.04s system 45% cpu 0.162 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.03s user 0.04s system 46% cpu 0.158 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.03s user 0.04s system 46% cpu 0.164 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.03s user 0.04s system 46% cpu 0.163 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.03s user 0.04s system 47% cpu 0.161 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.03s user 0.04s system 45% cpu 0.163 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.03s user 0.04s system 46% cpu 0.162 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.03s user 0.04s system 48% cpu 0.161 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.03s user 0.04s system 46% cpu 0.163 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.03s user 0.04s system 46% cpu 0.162 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.03s user 0.04s system 47% cpu 0.164 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.03s user 0.04s system 47% cpu 0.163 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.03s user 0.04s system 47% cpu 0.159 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.03s user 0.04s system 44% cpu 0.170 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.03s user 0.04s system 44% cpu 0.171 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.03s user 0.04s system 44% cpu 0.169 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.03s user 0.04s system 46% cpu 0.162 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 5 > timings.txt  0.03s user 0.04s system 47% cpu 0.160 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.03s user 0.03s system 37% cpu 0.165 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.03s user 0.03s system 38% cpu 0.161 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.03s user 0.03s system 39% cpu 0.161 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.03s user 0.03s system 37% cpu 0.168 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.03s user 0.03s system 39% cpu 0.159 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.03s user 0.03s system 39% cpu 0.159 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.03s user 0.03s system 39% cpu 0.158 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.03s user 0.03s system 38% cpu 0.160 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.03s user 0.03s system 38% cpu 0.160 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.03s user 0.03s system 36% cpu 0.168 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.03s user 0.03s system 37% cpu 0.160 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.03s user 0.03s system 38% cpu 0.158 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.03s user 0.03s system 38% cpu 0.158 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.03s user 0.03s system 39% cpu 0.160 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.03s user 0.03s system 38% cpu 0.163 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.03s user 0.03s system 39% cpu 0.160 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.03s user 0.03s system 40% cpu 0.160 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.03s user 0.03s system 38% cpu 0.158 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.03s user 0.03s system 37% cpu 0.163 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.03s user 0.03s system 38% cpu 0.159 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.03s user 0.03s system 39% cpu 0.160 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.03s user 0.03s system 36% cpu 0.165 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.03s user 0.03s system 37% cpu 0.161 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.03s user 0.03s system 39% cpu 0.159 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.03s user 0.03s system 38% cpu 0.159 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.03s user 0.03s system 38% cpu 0.159 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.03s user 0.03s system 38% cpu 0.158 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.03s user 0.03s system 38% cpu 0.159 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.03s user 0.03s system 39% cpu 0.163 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 4 > timings.txt  0.03s user 0.03s system 38% cpu 0.161 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.02s user 0.03s system 31% cpu 0.159 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.02s user 0.03s system 32% cpu 0.159 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.02s user 0.03s system 31% cpu 0.158 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.02s user 0.03s system 31% cpu 0.161 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.02s user 0.03s system 30% cpu 0.163 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.02s user 0.03s system 32% cpu 0.160 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.02s user 0.03s system 31% cpu 0.159 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.02s user 0.03s system 30% cpu 0.158 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.02s user 0.03s system 30% cpu 0.166 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.02s user 0.03s system 31% cpu 0.159 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.02s user 0.03s system 31% cpu 0.160 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.02s user 0.03s system 31% cpu 0.157 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.02s user 0.03s system 31% cpu 0.157 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.02s user 0.03s system 29% cpu 0.169 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.02s user 0.03s system 30% cpu 0.159 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.02s user 0.03s system 31% cpu 0.158 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.02s user 0.02s system 30% cpu 0.156 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.02s user 0.03s system 31% cpu 0.158 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.02s user 0.03s system 31% cpu 0.158 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.02s user 0.02s system 30% cpu 0.159 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.02s user 0.03s system 31% cpu 0.159 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.02s user 0.03s system 30% cpu 0.159 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.02s user 0.03s system 31% cpu 0.157 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.02s user 0.03s system 31% cpu 0.161 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.02s user 0.03s system 30% cpu 0.163 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.02s user 0.03s system 31% cpu 0.158 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.02s user 0.03s system 30% cpu 0.166 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.02s user 0.03s system 30% cpu 0.165 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.02s user 0.03s system 31% cpu 0.159 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 3 > timings.txt  0.02s user 0.03s system 30% cpu 0.161 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.02s user 0.02s system 23% cpu 0.157 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.02s user 0.02s system 23% cpu 0.153 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.02s user 0.02s system 24% cpu 0.153 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.02s user 0.02s system 23% cpu 0.156 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.02s user 0.02s system 23% cpu 0.155 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.02s user 0.02s system 23% cpu 0.154 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.02s user 0.02s system 23% cpu 0.156 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.02s user 0.02s system 24% cpu 0.158 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.02s user 0.02s system 23% cpu 0.156 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.02s user 0.02s system 24% cpu 0.155 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.02s user 0.02s system 25% cpu 0.155 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.02s user 0.02s system 25% cpu 0.157 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.02s user 0.02s system 23% cpu 0.161 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.02s user 0.02s system 23% cpu 0.155 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.02s user 0.02s system 25% cpu 0.155 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.02s user 0.02s system 22% cpu 0.165 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.02s user 0.02s system 23% cpu 0.155 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.02s user 0.02s system 24% cpu 0.157 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.02s user 0.02s system 23% cpu 0.155 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.02s user 0.02s system 23% cpu 0.155 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.02s user 0.02s system 24% cpu 0.154 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.02s user 0.02s system 23% cpu 0.155 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.02s user 0.02s system 23% cpu 0.155 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.02s user 0.02s system 23% cpu 0.155 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.02s user 0.02s system 24% cpu 0.156 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.02s user 0.02s system 23% cpu 0.157 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.02s user 0.02s system 23% cpu 0.155 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.02s user 0.02s system 25% cpu 0.154 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.02s user 0.02s system 22% cpu 0.170 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 2 > timings.txt  0.02s user 0.02s system 24% cpu 0.156 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.02s user 0.02s system 12% cpu 0.251 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.01s user 0.02s system 12% cpu 0.250 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.01s user 0.02s system 11% cpu 0.251 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.01s user 0.01s system 11% cpu 0.247 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.02s user 0.01s system 11% cpu 0.249 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.02s user 0.01s system 12% cpu 0.249 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.02s user 0.01s system 12% cpu 0.248 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.02s user 0.01s system 11% cpu 0.258 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.02s user 0.01s system 12% cpu 0.250 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.02s user 0.01s system 11% cpu 0.248 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.02s user 0.01s system 12% cpu 0.247 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.01s user 0.01s system 11% cpu 0.262 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.02s user 0.02s system 12% cpu 0.251 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.01s user 0.02s system 12% cpu 0.248 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.02s user 0.01s system 12% cpu 0.247 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.01s user 0.01s system 11% cpu 0.260 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.02s user 0.01s system 11% cpu 0.244 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.02s user 0.01s system 11% cpu 0.246 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.02s user 0.01s system 12% cpu 0.248 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.02s user 0.01s system 11% cpu 0.245 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.02s user 0.01s system 11% cpu 0.247 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.02s user 0.01s system 11% cpu 0.247 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.02s user 0.01s system 11% cpu 0.248 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.02s user 0.01s system 11% cpu 0.247 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.02s user 0.01s system 12% cpu 0.248 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.02s user 0.01s system 12% cpu 0.247 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.02s user 0.01s system 11% cpu 0.245 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.02s user 0.01s system 11% cpu 0.247 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.02s user 0.01s system 12% cpu 0.247 total
+./bin/trail_parallel.exe -file "${PROG}" -num-workers 1 > timings.txt  0.02s user 0.01s system 11% cpu 0.246 total
+./bin/trail_sequential.exe trail-stack -file "${PROG}" > timings.txt  0.36s user 0.69s system 96% cpu 1.088 total
+./bin/trail_sequential.exe trail-stack -file "${PROG}" > timings.txt  0.36s user 0.70s system 99% cpu 1.068 total
+./bin/trail_sequential.exe trail-stack -file "${PROG}" > timings.txt  0.35s user 0.65s system 99% cpu 1.007 total
+./bin/trail_sequential.exe trail-stack -file "${PROG}" > timings.txt  0.35s user 0.65s system 99% cpu 1.003 total
+./bin/trail_sequential.exe trail-stack -file "${PROG}" > timings.txt  0.36s user 0.64s system 99% cpu 1.007 total
+./bin/trail_sequential.exe trail-stack -file "${PROG}" > timings.txt  0.36s user 0.64s system 99% cpu 1.006 total
+./bin/trail_sequential.exe trail-stack -file "${PROG}" > timings.txt  0.36s user 0.65s system 99% cpu 1.012 total
+./bin/trail_sequential.exe trail-stack -file "${PROG}" > timings.txt  0.36s user 0.66s system 99% cpu 1.020 total
+./bin/trail_sequential.exe trail-stack -file "${PROG}" > timings.txt  0.36s user 0.64s system 99% cpu 1.003 total
+./bin/trail_sequential.exe trail-stack -file "${PROG}" > timings.txt  0.35s user 0.64s system 99% cpu 0.998 total
+./bin/trail_sequential.exe trail-stack -file "${PROG}" > timings.txt  0.36s user 0.65s system 99% cpu 1.008 total
+./bin/trail_sequential.exe trail-stack -file "${PROG}" > timings.txt  0.36s user 0.65s system 99% cpu 1.013 total
+./bin/trail_sequential.exe trail-stack -file "${PROG}" > timings.txt  0.35s user 0.65s system 99% cpu 1.003 total
+./bin/trail_sequential.exe trail-stack -file "${PROG}" > timings.txt  0.35s user 0.64s system 99% cpu 1.001 total
+./bin/trail_sequential.exe trail-stack -file "${PROG}" > timings.txt  0.35s user 0.66s system 99% cpu 1.017 total
+./bin/trail_sequential.exe trail-stack -file "${PROG}" > timings.txt  0.35s user 0.64s system 99% cpu 0.999 total
+./bin/trail_sequential.exe trail-stack -file "${PROG}" > timings.txt  0.36s user 0.65s system 99% cpu 1.011 total
+./bin/trail_sequential.exe trail-stack -file "${PROG}" > timings.txt  0.35s user 0.64s system 99% cpu 0.999 total
+./bin/trail_sequential.exe trail-stack -file "${PROG}" > timings.txt  0.36s user 0.64s system 99% cpu 1.000 total
+./bin/trail_sequential.exe trail-stack -file "${PROG}" > timings.txt  0.35s user 0.67s system 99% cpu 1.027 total
+./bin/trail_sequential.exe trail-stack -file "${PROG}" > timings.txt  0.35s user 0.68s system 99% cpu 1.033 total
+./bin/trail_sequential.exe trail-stack -file "${PROG}" > timings.txt  0.36s user 0.68s system 99% cpu 1.041 total
+./bin/trail_sequential.exe trail-stack -file "${PROG}" > timings.txt  0.35s user 0.68s system 99% cpu 1.035 total
+./bin/trail_sequential.exe trail-stack -file "${PROG}" > timings.txt  0.35s user 0.68s system 99% cpu 1.034 total
+./bin/trail_sequential.exe trail-stack -file "${PROG}" > timings.txt  0.35s user 0.66s system 99% cpu 1.015 total
+./bin/trail_sequential.exe trail-stack -file "${PROG}" > timings.txt  0.35s user 0.64s system 99% cpu 0.997 total
+./bin/trail_sequential.exe trail-stack -file "${PROG}" > timings.txt  0.36s user 0.66s system 99% cpu 1.017 total
+./bin/trail_sequential.exe trail-stack -file "${PROG}" > timings.txt  0.35s user 0.65s system 99% cpu 1.011 total
+./bin/trail_sequential.exe trail-stack -file "${PROG}" > timings.txt  0.35s user 0.66s system 99% cpu 1.018 total
+./bin/trail_sequential.exe trail-stack -file "${PROG}" > timings.txt  0.37s user 0.65s system 99% cpu 1.022 total
+./bin/trail_sequential.exe trail -file "${PROG}" > timings.txt  29.41s user 0.13s system 34% cpu 1:25.69 total
+./bin/trail_sequential.exe trail -file "${PROG}" > timings.txt  30.50s user 0.18s system 0% cpu 54:08.04 total
+./bin/trail_sequential.exe trail -file "${PROG}" > timings.txt  29.30s user 0.08s system 3% cpu 16:10.36 total
+./bin/trail_sequential.exe trail -file "${PROG}" > timings.txt  30.06s user 0.15s system 15% cpu 3:20.02 total
+./bin/trail_sequential.exe trail -file "${PROG}" > timings.txt  29.60s user 0.13s system 4% cpu 10:04.31 total
+./bin/trail_sequential.exe trail -file "${PROG}" > timings.txt  30.15s user 0.23s system 27% cpu 1:48.68 total
+./bin/trail_sequential.exe trail -file "${PROG}" > timings.txt  29.68s user 0.10s system 12% cpu 3:50.69 total
+./bin/trail_sequential.exe trail -file "${PROG}" > timings.txt  29.53s user 0.16s system 17% cpu 2:53.53 total
+./bin/trail_sequential.exe trail -file "${PROG}" > timings.txt  29.45s user 0.15s system 4% cpu 11:10.65 total
+./bin/trail_sequential.exe trail -file "${PROG}" > timings.txt  30.12s user 0.23s system 2% cpu 21:47.65 total
+./bin/trail_sequential.exe trail -file "${PROG}" > timings.txt  29.34s user 0.09s system 2% cpu 18:15.70 total
+./bin/trail_sequential.exe trail -file "${PROG}" > timings.txt  29.75s user 0.15s system 6% cpu 8:08.03 total
+./bin/trail_sequential.exe trail -file "${PROG}" > timings.txt  29.70s user 0.16s system 2% cpu 19:56.76 total
+./bin/trail_sequential.exe trail -file "${PROG}" > timings.txt  31.02s user 0.20s system 3% cpu 13:12.55 total
+./bin/trail_sequential.exe trail -file "${PROG}" > timings.txt  29.72s user 0.07s system 2% cpu 23:03.19 total
+./bin/trail_sequential.exe trail -file "${PROG}" > timings.txt  31.38s user 0.11s system 1% cpu 27:08.97 total
+./bin/trail_sequential.exe trail -file "${PROG}" > timings.txt  31.72s user 0.16s system 1% cpu 26:54.44 total
+./bin/trail_sequential.exe trail -file "${PROG}" > timings.txt  30.73s user 0.12s system 1% cpu 36:46.54 total
+./bin/trail_sequential.exe trail -file "${PROG}" > timings.txt  29.55s user 0.11s system 1% cpu 27:13.77 total
+./bin/trail_sequential.exe trail -file "${PROG}" > timings.txt  29.87s user 0.05s system 1% cpu 27:07.97 total
+./bin/trail_sequential.exe trail -file "${PROG}" > timings.txt  30.03s user 0.08s system 0% cpu 54:00.32 total
+./bin/trail_sequential.exe trail -file "${PROG}" > timings.txt  30.28s user 0.16s system 1% cpu 43:33.50 total
+./bin/trail_sequential.exe trail -file "${PROG}" > timings.txt  29.61s user 0.09s system 1% cpu 37:58.88 total
+./bin/trail_sequential.exe trail -file "${PROG}" > timings.txt  29.30s user 0.11s system 1% cpu 40:37.50 total
+./bin/trail_sequential.exe trail -file "${PROG}" > timings.txt  29.87s user 0.10s system 0% cpu 54:02.29 total
+./bin/trail_sequential.exe trail -file "${PROG}" > timings.txt  30.43s user 0.18s system 0% cpu 54:07.06 total
+./bin/trail_sequential.exe trail -file "${PROG}" > timings.txt  29.31s user 0.08s system 1% cpu 40:33.27 total
+./bin/trail_sequential.exe trail -file "${PROG}" > timings.txt  29.18s user 0.11s system 1% cpu 27:09.04 total
+./bin/trail_sequential.exe trail -file "${PROG}" > timings.txt  29.49s user 0.10s system 1% cpu 44:11.47 total
+./bin/trail_sequential.exe trail -file "${PROG}" > timings.txt  30.21s user 0.21s system 1% cpu 38:07.21 total"""
 
 
 print("8 workers")
@@ -380,56 +679,56 @@ for line in in_string.split("\n")[270:300]:
     seq.append(s[12])
     print( s[12])
 
-# tr8 = []
-# for line in in_string.split("\n")[300:330]:
-#     s = line.split()
-#     tr8.append(s[13])
-#     print( s[13])
-# tr7 = []
-# for line in in_string.split("\n")[330:360]:
-#     s = line.split()
-#     tr7.append(s[13])
-#     print( s[13])
-# tr6 = []
-# for line in in_string.split("\n")[360:390]:
-#     s = line.split()
-#     tr6.append(s[13])
-#     print( s[13])
-# tr5 = []
-# for line in in_string.split("\n")[390:420]:
-#     s = line.split()
-#     tr5.append(s[13])
-#     print( s[13])
-# tr4 = []
-# for line in in_string.split("\n")[420:450]:
-#     s = line.split()
-#     tr4.append(s[13])
-#     print( s[13])
-# tr3 = []
-# for line in in_string.split("\n")[450:480]:
-#     s = line.split()
-#     tr3.append(s[13])
-#     print( s[13])
-# tr2 = []
-# for line in in_string.split("\n")[480:510]:
-#     s = line.split()
-#     tr2.append(s[13])
-#     print( s[13])
-# tr1 = []
-# for line in in_string.split("\n")[510:540]:
-#     s = line.split()
-#     tr1.append(s[13])
-#     print( s[13])
-# trstack = []
-# for line in in_string.split("\n")[540:570]:
-#     s = line.split()
-#     trstack.append(s[12])
-#     print( s[12])
-# trseq = []
-# for line in in_string.split("\n")[570:600]:
-#     s = line.split()
-#     trseq.append(s[12])
-#     print( s[12])
+tr8 = []
+for line in in_string.split("\n")[300:330]:
+    s = line.split()
+    tr8.append(s[13])
+    print( s[13])
+tr7 = []
+for line in in_string.split("\n")[330:360]:
+    s = line.split()
+    tr7.append(s[13])
+    print( s[13])
+tr6 = []
+for line in in_string.split("\n")[360:390]:
+    s = line.split()
+    tr6.append(s[13])
+    print( s[13])
+tr5 = []
+for line in in_string.split("\n")[390:420]:
+    s = line.split()
+    tr5.append(s[13])
+    print( s[13])
+tr4 = []
+for line in in_string.split("\n")[420:450]:
+    s = line.split()
+    tr4.append(s[13])
+    print( s[13])
+tr3 = []
+for line in in_string.split("\n")[450:480]:
+    s = line.split()
+    tr3.append(s[13])
+    print( s[13])
+tr2 = []
+for line in in_string.split("\n")[480:510]:
+    s = line.split()
+    tr2.append(s[13])
+    print( s[13])
+tr1 = []
+for line in in_string.split("\n")[510:540]:
+    s = line.split()
+    tr1.append(s[13])
+    print( s[13])
+trstack = []
+for line in in_string.split("\n")[540:570]:
+    s = line.split()
+    trstack.append(s[12])
+    print( s[12])
+trseq = []
+for line in in_string.split("\n")[570:600]:
+    s = line.split()
+    trseq.append(s[12])
+    print( s[12])
 
 #########################################################
 
@@ -585,14 +884,14 @@ with open("results.csv", "w") as csvfile:
     writer.writerow(par1)
     writer.writerow(stackseq)
     writer.writerow(seq)
-    # writer.writerow(tr8)
-    # writer.writerow(tr7)
-    # writer.writerow(tr6)
-    # writer.writerow(tr5)
-    # writer.writerow(tr4)
-    # writer.writerow(tr3)
-    # writer.writerow(tr2)
-    # writer.writerow(tr1)
-    # writer.writerow(trstack)
-    # writer.writerow(trseq)
-    # writer.writerow(swipl)
+    writer.writerow(tr8)
+    writer.writerow(tr7)
+    writer.writerow(tr6)
+    writer.writerow(tr5)
+    writer.writerow(tr4)
+    writer.writerow(tr3)
+    writer.writerow(tr2)
+    writer.writerow(tr1)
+    writer.writerow(trstack)
+    writer.writerow(trseq)
+    writer.writerow(swipl)
