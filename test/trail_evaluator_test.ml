@@ -1,5 +1,6 @@
 open OUnit2
 open Trail_sequential.Trail_evaluator
+open Prolog_interpreter.Util
 open Core
 
 
@@ -21,10 +22,7 @@ let eval_query (b, db, _ ) _vars =
   let b_converted : (Exp.t ref * int) list = List.map b ~f:(fun e -> convert e var_mapping |> ref , 0) in
   let trail = Stack.create () in
   let res, _ = eval_query b_converted db_converted trail var_mapping in
-  let res_str =
-    List.fold res ~init:"" ~f:(fun acc soln -> soln ^"\n"^acc)
-  in
-  if List.length res > 0 then res_str^"true\n" else res_str^"false\n"
+  res
 
 let trail_evaluator_test_suite =
     "TrailEvaluator" >::: (
@@ -42,17 +40,19 @@ let trail_evaluator_test_suite =
         )
         [
             (* Evaluating results of a query with a given db *)
-            (
+            ( string_of_res
                 (eval_query
                     (
                         [],
                         [],
                         []
                     ) String.Set.empty
-                )
-            ), "\ntrue\n";
+                ) 
+                [] 0
+            ), "true\n";
 
             (
+                string_of_res
                 (eval_query
                     (
                         [TermExp ("true", [])],
@@ -60,10 +60,12 @@ let trail_evaluator_test_suite =
                         []
                       ) String.Set.empty
                 )
-            ), "\ntrue\n";
+                [] 0
+            ), "true\n";
 
 
             (
+                string_of_res
                 (eval_query
                     (
                         [TermExp ("male", [TermExp ("elizabeth", [])])],
@@ -71,9 +73,11 @@ let trail_evaluator_test_suite =
                         []
                     ) String.Set.empty
                 )
+                [] 0
             ), "false\n";
 
             (
+                string_of_res
                 (eval_query
                     (
                         [TermExp ("parent", [VarExp "X"; TermExp ("charles1", [])])],
@@ -81,9 +85,11 @@ let trail_evaluator_test_suite =
                         []
                     ) (String.Set.of_list ["X"])
                 )
+                [VarExp "X"] 1
             ), "false\n";
 
             (
+                string_of_res
                 (eval_query
                     (
                         [TermExp ("male", [TermExp ("elizabeth", [])])],
@@ -91,9 +97,11 @@ let trail_evaluator_test_suite =
                         []
                     ) String.Set.empty
                 )
+                [] 0
             ), "false\n";
 
             (
+                string_of_res
                 (eval_query
                     (
                         [TermExp ("male", [TermExp ("elizabeth", [])])],
@@ -101,9 +109,11 @@ let trail_evaluator_test_suite =
                         []
                     ) String.Set.empty
                 )
+                [] 0
             ), "false\n";
 
             (
+                string_of_res
                 (eval_query
                     (
                         [TermExp ("female", [TermExp ("elizabeth", [])])],
@@ -111,9 +121,11 @@ let trail_evaluator_test_suite =
                         []
                     ) String.Set.empty
                 )
-            ), "\ntrue\n";
+                [] 0
+            ), "true\n";
 
             (
+                string_of_res
                 (eval_query
                     (
                         [TermExp ("female", [TermExp ("elizabeth", [])])],
@@ -121,9 +133,11 @@ let trail_evaluator_test_suite =
                         []
                     ) String.Set.empty
                 )
-            ), "\ntrue\n";
+                [] 0
+            ), "true\n";
 
             (
+                string_of_res
                 (eval_query
                     (
                         [TermExp ("female", [TermExp ("elizabeth", [])])],
@@ -131,9 +145,11 @@ let trail_evaluator_test_suite =
                         []
                     ) String.Set.empty
                 )
-            ), "\ntrue\n";
+                [] 0
+            ), "true\n";
 
             (
+                string_of_res
                 (eval_query
                     (
                         [TermExp("age", [TermExp("zaid",[]); VarExp "Y"])],
@@ -142,9 +158,11 @@ let trail_evaluator_test_suite =
                     )
                     (String.Set.of_list ["Y"])
                 )
+                [VarExp "Y"] 1
             ), "false\n";
 
             (
+                string_of_res
                 (eval_query
                     (
                         [TermExp("age", [TermExp("zaid",[]); VarExp "Y"])],
@@ -154,10 +172,12 @@ let trail_evaluator_test_suite =
                     )
                   (String.Set.of_list ["Y"])
                 )
+                [VarExp "Y"] 1
             ), "false\n";
 
 
             (
+                string_of_res
                 (eval_query
                     (
                         [TermExp("age", [VarExp "E"; VarExp "Z"])],
@@ -167,9 +187,11 @@ let trail_evaluator_test_suite =
                     )
                   (String.Set.of_list ["E"; "Z"])
                 )
-            ), "====================\nE = adam\nZ = 10\n====================\n====================\nE = zaid\nZ = 5\n====================\ntrue\n";
+                [VarExp "E"; VarExp "Z"] 2
+            ), "====================\nZ = 10\nE = adam\n====================\n====================\nZ = 5\nE = zaid\n====================\ntrue\n";
 
             (
+                string_of_res
                 (eval_query
                     (
                         [TermExp("age", [VarExp "X";  (IntExp 5)])],
@@ -179,9 +201,11 @@ let trail_evaluator_test_suite =
                     )
                   (String.Set.of_list ["X"])
                 )
+                [VarExp "X"] 1
             ), "====================\nX = zaid\n====================\ntrue\n";
 
             (
+                string_of_res
                 (eval_query
                     (
                         [TermExp ("a", [])],
@@ -190,9 +214,11 @@ let trail_evaluator_test_suite =
                     )
                     String.Set.empty
                 )
-            ), "\ntrue\n";
+                [] 0
+            ), "true\n";
 
             (
+                string_of_res
                (eval_query
                   (
                     [TermExp ("prepend", [
@@ -217,9 +243,11 @@ let trail_evaluator_test_suite =
                   )
                   (String.Set.of_list ["X"])
                )
+                [VarExp "X"] 1
             ), "====================\nX = [1, 2]\n====================\ntrue\n";
 
             (
+                string_of_res
                (eval_query
                   (
                     [TermExp("nat1", [VarExp "Z"])],
@@ -234,9 +262,11 @@ let trail_evaluator_test_suite =
                   )
                   (String.Set.of_list ["Z"])
                )
+                [VarExp "Z"] 1
             ), "====================\nZ = 1\n====================\ntrue\n";
 
             (
+                string_of_res
                (eval_query
                   (
                     [TermExp("is_ten", [VarExp "Z"])],
@@ -251,9 +281,11 @@ let trail_evaluator_test_suite =
                   )
                   (String.Set.of_list ["Z"])
                )
+                [VarExp "Z"] 1
             ), "====================\nZ = 10\n====================\ntrue\n";
 
             (
+                string_of_res
                (eval_query
                   (
                     [TermExp("is_five", [VarExp "Z"])],
@@ -269,9 +301,11 @@ let trail_evaluator_test_suite =
                   )
                   (String.Set.of_list ["Z"])
                )
+                [VarExp "Z"] 1
             ), "====================\nZ = 5\n====================\ntrue\n";
 
             (
+                string_of_res
                (eval_query
                   (
                     [TermExp("nat", [VarExp "Z"])],
@@ -289,6 +323,7 @@ let trail_evaluator_test_suite =
                   )
                   (String.Set.of_list ["Z"])
                )
+                [VarExp "Z"] 1
             ), "====================\n\
                 Z = 0\n\
                 ====================\n\
@@ -298,6 +333,7 @@ let trail_evaluator_test_suite =
                 true\n";
 
             (
+                string_of_res
                (eval_query
                   (
                     [TermExp("not_two", [VarExp "Z"])],
@@ -315,6 +351,7 @@ let trail_evaluator_test_suite =
                   )
                   (String.Set.of_list ["Z"])
                )
+                [VarExp "Z"] 1
             ), "====================\n\
                 Z = 1\n\
                 ====================\n\
@@ -326,6 +363,7 @@ let trail_evaluator_test_suite =
                 ====================\ntrue\n";
 
             (
+                string_of_res
                (eval_query
                   (
                     [TermExp("nat1", [VarExp "Z"])],
@@ -345,6 +383,7 @@ let trail_evaluator_test_suite =
                   )
                   (String.Set.of_list ["Z"])
                )
+                [VarExp "Z"] 1
             ), "====================\n\
                 Z = -1\n\
                 ====================\n\
@@ -354,6 +393,7 @@ let trail_evaluator_test_suite =
                 true\n";
 
             (
+                string_of_res
                 (eval_query
                     (
                         [TermExp("age", [VarExp "X"; VarExp "Y"]); TermExp("female", [VarExp "X"])],
@@ -362,9 +402,11 @@ let trail_evaluator_test_suite =
                     )
                   (String.Set.of_list ["X"; "Y"])
                 )
-            ), "====================\nX = ann\nY = 12\n====================\ntrue\n";
+                [VarExp "X"; VarExp "Y"] 2
+            ), "====================\nY = 12\nX = ann\n====================\ntrue\n";
 
             (
+                string_of_res
                 (eval_query
                     (
                         [TermExp("sibling", [TermExp("sally",[]); TermExp("erica",[])])],
@@ -373,9 +415,11 @@ let trail_evaluator_test_suite =
                     )
                   String.Set.empty
                 )
-            ), "\ntrue\n";
+                [] 0
+            ), "true\n";
 
             (
+                string_of_res
                 (eval_query
                     (
                         [TermExp("sibling", [VarExp "Z"; VarExp "E"])],
@@ -384,6 +428,7 @@ let trail_evaluator_test_suite =
                     )
                   (String.Set.of_list ["Z"; "E"])
                 )
+                [VarExp "Z"; VarExp "E"] 2
             ),
             "====================
 E = sally
@@ -413,6 +458,7 @@ true
 ";
 
             (
+                string_of_res
                 (eval_query
                     (
                         [TermExp("animal", [VarExp "X"; VarExp "Y"])],
@@ -421,9 +467,11 @@ true
                     )
                   (String.Set.of_list ["X"; "Y"])
                 )
-            ), "====================\nX = tom\nY = is free\n====================\ntrue\n";
+                [VarExp "X"; VarExp "Y"] 2
+            ), "====================\nY is free\nX = tom\n====================\ntrue\n";
 
             (
+                string_of_res
                 (eval_query
                     (
                         [TermExp("animal", [VarExp "X"; VarExp "Y"]); VarExp "Z"],
@@ -432,9 +480,11 @@ true
                     )
                   (String.Set.of_list ["X"; "Y"; "Z"])
                 )
-            ), "====================\nZ = is free\nX = tom\nY = is free\n====================\ntrue\n";
+                [VarExp "X"; VarExp "Y"; VarExp "Z"] 3
+            ), "====================\nZ is free\nY is free\nX = tom\n====================\ntrue\n";
 
             (
+                string_of_res
                 (eval_query
                     (
                         [VarExp "X"],
@@ -443,9 +493,11 @@ true
                     )
                   (String.Set.of_list ["X"])
                 )
-            ), "====================\nX = is free\n====================\ntrue\n";
+                [VarExp "X"] 1
+            ), "====================\nX is free\n====================\ntrue\n";
 
             (
+                string_of_res
                 (eval_query
                     (
                         [TermExp("animal", [VarExp "X"; VarExp "Y"]); VarExp "Z"],
@@ -454,9 +506,11 @@ true
                     )
                   (String.Set.of_list ["X"; "Y"; "Z"])
                 )
-            ), "====================\nZ = is free\nX = tom\nY = is free\n====================\ntrue\n";
+                [VarExp "X"; VarExp "Y"; VarExp "Z"] 3
+            ), "====================\nZ is free\nY is free\nX = tom\n====================\ntrue\n";
 
             (
+                string_of_res
                 (eval_query
                     (
                         [TermExp("b", [TermExp("a", [TermExp("true",[])])])],
@@ -465,6 +519,7 @@ true
                     )
                   String.Set.empty
                 )
+                [] 0
             ), "false\n";
 
         ]

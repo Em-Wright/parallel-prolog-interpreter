@@ -20,11 +20,6 @@ module Var = struct
     | None -> "Var_" ^ name
     | Some x -> f !x
 
-  let to_soln_string {name=_; instance} (f : 'a -> string) =
-    match instance with
-    | None -> "is free"
-    | Some x -> f !x
-
   let equal v1 v2 = String.equal v1.name v2.name
 
 end
@@ -54,12 +49,12 @@ module Exp = struct
       | TermExp of string * t ref list
       | ArithmeticExp of Ast.arithmetic_operator * t Arithmetic_operand.t * t Arithmetic_operand.t
 
-    let rec resolve_exp_instance (e : t) =
+    let rec resolve (e : t) =
       match e with
       | VarExp v -> (
           match !v.instance with
-          | None -> VarExp v
-          | Some e -> resolve_exp_instance !e
+          | None -> e
+          | Some e -> resolve !e
         )
       | _ -> e
 
@@ -69,7 +64,7 @@ module Exp = struct
           match list_exp with
           | TermExp ("empty_list", []) -> ""
           | TermExp ("list", [element; rest]) ->(
-            let resolved = resolve_exp_instance !rest in
+            let resolved = resolve !rest in
             match resolved with
             | TermExp ("empty_list", _) -> to_string !element
             | TermExp ("list", _) ->
@@ -234,26 +229,7 @@ module Clause = struct
     (head2, body2)
 end
 
-let print_solution var_mapping =
-  print_endline "====================";
-  Hashtbl.iteri var_mapping
-    ~f:(fun ~key ~data ->
-        let line = key ^ " = " ^ (Var.to_string data Exp.to_string) in
-        print_endline line
-      );
-  print_endline "===================="
 
-let solution_to_string var_mapping =
-  let soln_str =
-  (
-    Hashtbl.fold ~init:"" var_mapping
-    ~f:(fun ~key ~data acc ->
-        acc ^
-        key ^ " = " ^ (Var.to_soln_string data Exp.to_string) ^"\n"
-      )
-  )in
-  ( if Hashtbl.length var_mapping > 0 then
-      "====================\n"^soln_str^"====================" else "")
 
 let perform_arithmetic (op : Ast.arithmetic_operator) i1 i2 =
   match op with
@@ -278,18 +254,32 @@ let resolve_arith (a : Exp.t Arithmetic_operand.t) =
     in
     resolve_inner (Var.get_instance !v)
 
-let rec resolve (e : Exp.t) =
-  match e with
-  | IntExp _ -> e
-  | VarExp v -> (match Var.get_instance !v with
-      | None -> e
-      | Some v -> resolve !v
-    )
-  | _ -> e
+let arithmetic_convert_back (t : Exp.t Arithmetic_operand.t) : Ast.arithmetic_operand =
+  let resolved = resolve_arith t in
+  match resolved with
+  (* TODO - need to resolve to furthest instance first? remove print statement *)
+  | ArithmeticVar v -> ArithmeticVar (Var.name !v)
+  | ArithmeticInt i -> ArithmeticInt i
+
+let rec convert_back (t : Exp.t) : Ast.exp =
+  let resolved = Exp.resolve t in
+  match resolved with 
+  | VarExp v ->  VarExp (Var.name !v)
+  | IntExp i -> IntExp i
+  | TermExp (name, args) -> 
+    let new_args = List.map args ~f:(fun arg -> convert_back !arg ) in
+    TermExp (name, new_args)
+  | ArithmeticExp (op, op1, op2) ->
+    let new_op1 = arithmetic_convert_back op1 in
+    let new_op2 = arithmetic_convert_back op2 in 
+    ArithmeticExp (op, new_op1, new_op2)
+
 
 let rec eval_query q db (trail : Trail.t) var_mapping =
   match q with
-  | [] -> [solution_to_string var_mapping], []
+  | [] -> 
+    let var_mapping_list = Hashtbl.to_alist var_mapping in
+    [List.map var_mapping_list ~f:(fun (a,b) -> ((VarExp a, convert_back (VarExp (ref b))) : Ast.exp * Ast.exp) ) ], []
   | (g1, depth)::gl ->
       (
         match !g1 with
@@ -324,7 +314,7 @@ let rec eval_query q db (trail : Trail.t) var_mapping =
             res
           )
         | TermExp("greater_than", [lhs; rhs]) -> (
-          match (resolve !lhs), (resolve !rhs) with
+          match (Exp.resolve !lhs), (Exp.resolve !rhs) with
           | IntExp i1, IntExp i2 ->
             if i1 > i2 then
               eval_query gl db trail var_mapping
@@ -332,7 +322,7 @@ let rec eval_query q db (trail : Trail.t) var_mapping =
           | _ -> [], [] (* arguments insufficiently instantiated *)
         )
         | TermExp("greater_than_or_eq", [lhs; rhs]) -> (
-            match (resolve !lhs), (resolve !rhs) with
+            match (Exp.resolve !lhs), (Exp.resolve !rhs) with
             | IntExp i1, IntExp i2 ->
               if i1 >= i2 then
                 eval_query gl db trail var_mapping
@@ -340,7 +330,7 @@ let rec eval_query q db (trail : Trail.t) var_mapping =
             | _ -> [], [] (* arguments insufficiently instantiated *)
           )
         | TermExp("less_than", [lhs; rhs]) -> (
-            match (resolve !lhs), (resolve !rhs) with
+            match (Exp.resolve !lhs), (Exp.resolve !rhs) with
             | IntExp i1, IntExp i2 ->
               if i1 < i2 then
                 eval_query gl db trail var_mapping
@@ -348,7 +338,7 @@ let rec eval_query q db (trail : Trail.t) var_mapping =
             | _ -> [], [] (* arguments insufficiently instantiated *)
           )
         | TermExp("less_than_or_eq", [lhs; rhs]) -> (
-            match (resolve !lhs), (resolve !rhs) with
+            match (Exp.resolve !lhs), (Exp.resolve !rhs) with
             | IntExp i1, IntExp i2 ->
               if i1 <= i2 then
                 eval_query gl db trail var_mapping
@@ -447,7 +437,6 @@ let rec convert (t : Ast.exp) var_mapping : Exp.t =
     let new_op1 = arithmetic_convert op1 var_mapping in let new_op2 = arithmetic_convert op2 var_mapping in
     ArithmeticExp (op, new_op1, new_op2)
 
-
 let command =
   Command.basic
     ~summary:"Sequential Prolog interpreter using a trail stack"
@@ -476,8 +465,6 @@ let command =
               let b_converted : (Exp.t ref * int) list = List.map b ~f:(fun e -> convert e var_mapping |> ref , 0) in
               let trail = Stack.create () in
               let res, _ = eval_query b_converted db_converted trail var_mapping in
-              if not (Int.equal (List.length res) 0) then print_endline "true\n===========";
-              List.iter res ~f:(fun r -> print_endline r ; print_endline "==========");
-              []
+              res
             )
     ]
