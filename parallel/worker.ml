@@ -76,6 +76,7 @@ let remove_due_to_cut path cut_path =
   let rec loop p cp =
     match p, cp with
     | (x,dx)::_, (y, dy)::[] -> if x > y && dx=dy then true else false
+    | (x,dx)::xs, (y, dy)::ys::[] -> if x > y && dx=dy then true else loop xs [ys]
     | (x,dx)::xs, (y, dy)::ys -> if x = y && dx=dy then loop xs ys else false
     | _,_ -> false
   in
@@ -83,7 +84,7 @@ let remove_due_to_cut path cut_path =
 
 let rec truncate path depth =
   match path with
-  | (_, d)::p -> if d > depth then truncate p depth else  path
+  | (_, d)::p -> if d > (depth+1) then truncate p depth else  path
   | [] -> []
 
 module T = struct
