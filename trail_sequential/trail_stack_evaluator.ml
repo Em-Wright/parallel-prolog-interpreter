@@ -19,7 +19,7 @@ let rec eval_inner (q : Job.t Deque.t) db results =
               let trail = Trail.create () in
               if (unify lhs rhs trail) then (
                 Deque.enqueue_back q {goals=gl; var_mapping=job.var_mapping}
-              ) else Trail.undo trail
+              ) else Trail.undo trail 0
             | TermExp("not_equal", [lhs;rhs]) -> (
                 (* check if the lhs and rhs can unify. If they can, this is not a
                    successful substitution. If they don't, we can continue solving the
@@ -27,33 +27,33 @@ let rec eval_inner (q : Job.t Deque.t) db results =
                 *)
                 let trail = Trail.create () in
                 if not (unify lhs rhs trail) then (
-                  Trail.undo trail;
+                  Trail.undo trail 0;
                   Deque.enqueue_back q {goals=gl; var_mapping=job.var_mapping}
-                ) else Trail.undo trail
+                ) else Trail.undo trail 0
               )
             | TermExp("greater_than", [lhs; rhs]) -> (
-                match (resolve !lhs), (resolve !rhs) with
+                match (Exp.resolve !lhs), (Exp.resolve !rhs) with
                 | IntExp i1, IntExp i2 ->
                   if i1 > i2 then
                     Deque.enqueue_back q {goals=gl; var_mapping=job.var_mapping}
                 | _ -> () (* arguments insufficiently instantiated *)
               )
             | TermExp("greater_than_or_eq", [lhs; rhs]) -> (
-                match (resolve !lhs), (resolve !rhs) with
+                match (Exp.resolve !lhs), (Exp.resolve !rhs) with
                 | IntExp i1, IntExp i2 ->
                   if i1 >= i2 then
                     Deque.enqueue_back q {goals=gl; var_mapping=job.var_mapping}
                 | _ -> () (* arguments insufficiently instantiated *)
               )
             | TermExp("less_than", [lhs; rhs]) -> (
-                match (resolve !lhs), (resolve !rhs) with
+                match (Exp.resolve !lhs), (Exp.resolve !rhs) with
                 | IntExp i1, IntExp i2 ->
                   if i1 < i2 then
                     Deque.enqueue_back q {goals=gl; var_mapping=job.var_mapping}
                 | _ -> () (* arguments insufficiently instantiated *)
               )
             | TermExp("less_than_or_eq", [lhs; rhs]) -> (
-                match (resolve !lhs), (resolve !rhs) with
+                match (Exp.resolve !lhs), (Exp.resolve !rhs) with
                 | IntExp i1, IntExp i2 ->
                   if i1 <= i2 then
                     Deque.enqueue_back q {goals=gl; var_mapping=job.var_mapping}
@@ -72,7 +72,7 @@ let rec eval_inner (q : Job.t Deque.t) db results =
                           | VarExp _ -> let trail = Trail.create () in
                             if unify lhs (ref (Exp.IntExp result)) trail then
                               Deque.enqueue_back q {goals=gl; var_mapping=job.var_mapping}
-                            else Trail.undo trail
+                            else Trail.undo trail 0
                           | IntExp i -> if i = result then
                               Deque.enqueue_back q {goals=gl; var_mapping=job.var_mapping}
                           | _ -> ()
@@ -86,7 +86,7 @@ let rec eval_inner (q : Job.t Deque.t) db results =
                       | VarExp _ -> let trail = Trail.create () in
                         if unify lhs (ref (Exp.IntExp result)) trail then
                           Deque.enqueue_back q {goals=gl; var_mapping=job.var_mapping }
-                        else Trail.undo trail
+                        else Trail.undo trail 0
                       | IntExp i -> if i = result then
                           Deque.enqueue_back q {goals=gl; var_mapping=job.var_mapping}
                       | _ -> ()
@@ -95,19 +95,22 @@ let rec eval_inner (q : Job.t Deque.t) db results =
                 | _ -> ()
               )
             | TermExp(_,_) -> (
+                let trail = Trail.create () in
                 let db_copy = List.map db ~f:(fun clause ->
-                    Clause.copy clause ) in
+                    Clause.copy clause trail ) in
+                Trail.undo trail 0;
                 let rec loop db_copy =
                   match db_copy with
                   | [] -> ()
                   | c::dbs -> (
-                      let (head, body) = Clause.copy c in
                       let trail = Trail.create () in
+                      let (head, body) = Clause.copy c trail in
+                      Trail.undo trail 0;
                       if unify head g1 trail then (
                         let new_job = Job.deep_copy {goals=(body@gl); var_mapping=job.var_mapping} in
                         Deque.enqueue_back q new_job
                       ) ;
-                      Trail.undo trail;
+                      Trail.undo trail 0;
                       loop dbs
                     )
                 in

@@ -1,4 +1,5 @@
 open OUnit2
+open Trail_sequential.Trail_util
 open Trail_sequential.Trail_evaluator
 open Prolog_interpreter.Util
 open Core

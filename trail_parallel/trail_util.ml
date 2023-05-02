@@ -140,9 +140,6 @@ module Arithmetic_operand = struct
 
 end
 
-
-
-
 module Exp = struct
     type t =
       | VarExp of t Var.t ref
@@ -462,7 +459,6 @@ let rec unify (t1_ref : Exp.t ref) (t2_ref : Exp.t ref) (trail : Trail.t) =
       | VarExp _ -> unify t2_ref t1_ref trail
       | _ -> false
     )
-
 
 let realise_solution var_mapping =
   Hashtbl.fold var_mapping

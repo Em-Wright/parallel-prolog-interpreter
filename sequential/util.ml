@@ -17,8 +17,6 @@ exception FAILED_SUBSTITUTION of string
 let (fresh, reset) =
     let nxt = ref 0 in
     let f () = (nxt := !nxt + 1;
-                (* if !nxt > 125000 then *)
-                (* print_endline ("Fresh var:"^(string_of_int !nxt)) ; *)
                 string_of_int (!nxt)) in
     let r () = nxt := 0 in
     (f, r)
@@ -73,7 +71,6 @@ let rec find_vars_string q  =
      * returns the list reversed with only one copy of each element
   adapted from https://rosettacode.org/wiki/Remove_duplicate_elements#OCaml
 *)
-
 let uniq (l : exp list) =
     let rec tail_uniq a l =
         match l with
@@ -299,7 +296,6 @@ let perform_arithmetic (op : arithmetic_operator) i1 i2 : int =
   | MINUS -> (i1 - i2)
   | MULT  -> (i1 * i2)
   | DIV   -> (i1 / i2)
-
 
 (*
    string_of_res:
