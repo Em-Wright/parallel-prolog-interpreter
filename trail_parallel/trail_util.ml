@@ -37,11 +37,6 @@ module Var = struct
     | None -> "Var_" ^ name
     | Some x -> (f !x)
 
-  let to_soln_string ({name=_; instance} : 'a t) (f : 'a -> string) =
-    match instance with
-    | None -> "is free"
-    | Some x -> f !x
-
   let get_all_var_names ({name;instance} : 'b serialisable) ( f : 'b -> string list -> string list) acc =
     match instance with
     | None -> name::acc
@@ -204,7 +199,7 @@ module Exp = struct
         "[" ^ (inner_string list_exp) ^ "]"
       in
       match t with
-      | VarExp v -> (Var.to_soln_string !v to_string)
+      | VarExp v -> (Var.to_string !v to_string)
       | IntExp i -> Int.to_string i
       | TermExp (name, args) ->
         ( match name with
