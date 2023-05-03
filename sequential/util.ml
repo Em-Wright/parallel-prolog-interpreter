@@ -262,6 +262,7 @@ let rec unify constraints =
                   our substitution (s,t) is valid, and so we add it to
                   the front of the resulting unifier list, with any
                   relevant substitutions applied *)
+                  (* TODO - would be good to remove the O(n2)-ness *)
                 else let phi = replace c' [(s,t)] |> unify in (
                         match phi with
                         | None -> None

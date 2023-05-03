@@ -98,11 +98,5 @@ let trail_util_test_suite =
         ), "Var_X + Var_Y";
 
 
-        (* TODO - actually write the tests *)
-
-        (* need testing for get_furthest_instance, occurs, unify, resolve,
-        Clause.deep_copy, Clause.serialise, Clause.deserialise, Job.deep_copy, Dec.serialise,
-        Dec.deserialise; Trail.push, Trail.undo *)
-
     ]
   )

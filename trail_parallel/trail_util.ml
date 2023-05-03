@@ -629,7 +629,6 @@ module Toplevel_to_worker = struct
   [@@deriving bin_io]
 end
 
-
 let remove_due_to_cut path cut_path =
   let rec loop p cp =
     match p, cp with
